@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteRouteImport } from './routes/app/route'
 import { Route as AppDashboardRouteImport } from './routes/app/dashboard'
+import { Route as AppDocumentsRouteImport } from './routes/app/documents'
 import { Route as AppRequirementsIndexRouteImport } from './routes/app/requirements/index'
 import { Route as AppRequirementsReqIdRouteImport } from './routes/app/requirements/$reqId'
 import { Route as AppSilosIndexRouteImport } from './routes/app/silos/index'
@@ -30,6 +31,11 @@ const AppRouteRoute = AppRouteRouteImport.update({
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppDocumentsRoute = AppDocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppRequirementsIndexRoute = AppRequirementsIndexRouteImport.update({
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
   '/app/dashboard': typeof AppDashboardRoute
+  '/app/documents': typeof AppDocumentsRoute
   '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
   '/app/silos/$siloId': typeof AppSilosSiloIdRoute
   '/app/requirements/': typeof AppRequirementsIndexRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
   '/app/dashboard': typeof AppDashboardRoute
+  '/app/documents': typeof AppDocumentsRoute
   '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
   '/app/silos/$siloId': typeof AppSilosSiloIdRoute
   '/app/requirements': typeof AppRequirementsIndexRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
   '/app/dashboard': typeof AppDashboardRoute
+  '/app/documents': typeof AppDocumentsRoute
   '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
   '/app/silos/$siloId': typeof AppSilosSiloIdRoute
   '/app/requirements/': typeof AppRequirementsIndexRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/dashboard'
+    | '/app/documents'
     | '/app/requirements/$reqId'
     | '/app/silos/$siloId'
     | '/app/requirements/'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/dashboard'
+    | '/app/documents'
     | '/app/requirements/$reqId'
     | '/app/silos/$siloId'
     | '/app/requirements'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/dashboard'
+    | '/app/documents'
     | '/app/requirements/$reqId'
     | '/app/silos/$siloId'
     | '/app/requirements/'
@@ -137,6 +149,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/app/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/documents': {
+      id: '/app/documents'
+      path: '/documents'
+      fullPath: '/app/documents'
+      preLoaderRoute: typeof AppDocumentsRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/requirements/': {
@@ -172,6 +191,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
+  AppDocumentsRoute: typeof AppDocumentsRoute
   AppRequirementsReqIdRoute: typeof AppRequirementsReqIdRoute
   AppSilosSiloIdRoute: typeof AppSilosSiloIdRoute
   AppRequirementsIndexRoute: typeof AppRequirementsIndexRoute
@@ -180,6 +200,7 @@ interface AppRouteRouteChildren {
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
+  AppDocumentsRoute: AppDocumentsRoute,
   AppRequirementsReqIdRoute: AppRequirementsReqIdRoute,
   AppSilosSiloIdRoute: AppSilosSiloIdRoute,
   AppRequirementsIndexRoute: AppRequirementsIndexRoute,
