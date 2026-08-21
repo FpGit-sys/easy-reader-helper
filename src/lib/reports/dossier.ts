@@ -74,7 +74,7 @@ export function generateDossier(state: AppState, options: DossierOptions) {
     startY: y,
     head: [["Indicador", "Valor"]],
     body: [
-      ["Critérios aplicáveis", String(idx.aplicaveis)],
+      ["Critérios aplicáveis", String(idx.totalAplicaveis)],
       ["Atendidos", String(idx.atendidos)],
       ["Pendentes", String(idx.pendentes)],
       ["Críticos", String(idx.criticos)],
