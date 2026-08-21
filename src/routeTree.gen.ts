@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteRouteImport } from './routes/app/route'
 import { Route as AppDashboardRouteImport } from './routes/app/dashboard'
 import { Route as AppRequirementsIndexRouteImport } from './routes/app/requirements/index'
+import { Route as AppRequirementsReqIdRouteImport } from './routes/app/requirements/$reqId'
 import { Route as AppSilosIndexRouteImport } from './routes/app/silos/index'
 import { Route as AppSilosSiloIdRouteImport } from './routes/app/silos/$siloId'
 
@@ -36,6 +37,11 @@ const AppRequirementsIndexRoute = AppRequirementsIndexRouteImport.update({
   path: '/requirements/',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppRequirementsReqIdRoute = AppRequirementsReqIdRouteImport.update({
+  id: '/requirements/$reqId',
+  path: '/requirements/$reqId',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppSilosIndexRoute = AppSilosIndexRouteImport.update({
   id: '/silos/',
   path: '/silos/',
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
   '/app/dashboard': typeof AppDashboardRoute
+  '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
   '/app/silos/$siloId': typeof AppSilosSiloIdRoute
   '/app/requirements/': typeof AppRequirementsIndexRoute
   '/app/silos/': typeof AppSilosIndexRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
   '/app/dashboard': typeof AppDashboardRoute
+  '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
   '/app/silos/$siloId': typeof AppSilosSiloIdRoute
   '/app/requirements': typeof AppRequirementsIndexRoute
   '/app/silos': typeof AppSilosIndexRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
   '/app/dashboard': typeof AppDashboardRoute
+  '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
   '/app/silos/$siloId': typeof AppSilosSiloIdRoute
   '/app/requirements/': typeof AppRequirementsIndexRoute
   '/app/silos/': typeof AppSilosIndexRoute
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/dashboard'
+    | '/app/requirements/$reqId'
     | '/app/silos/$siloId'
     | '/app/requirements/'
     | '/app/silos/'
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/dashboard'
+    | '/app/requirements/$reqId'
     | '/app/silos/$siloId'
     | '/app/requirements'
     | '/app/silos'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/app/dashboard'
+    | '/app/requirements/$reqId'
     | '/app/silos/$siloId'
     | '/app/requirements/'
     | '/app/silos/'
@@ -134,6 +146,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRequirementsIndexRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/requirements/$reqId': {
+      id: '/app/requirements/$reqId'
+      path: '/requirements/$reqId'
+      fullPath: '/app/requirements/$reqId'
+      preLoaderRoute: typeof AppRequirementsReqIdRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/silos/': {
       id: '/app/silos/'
       path: '/silos'
@@ -153,6 +172,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
+  AppRequirementsReqIdRoute: typeof AppRequirementsReqIdRoute
   AppSilosSiloIdRoute: typeof AppSilosSiloIdRoute
   AppRequirementsIndexRoute: typeof AppRequirementsIndexRoute
   AppSilosIndexRoute: typeof AppSilosIndexRoute
@@ -160,6 +180,7 @@ interface AppRouteRouteChildren {
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
+  AppRequirementsReqIdRoute: AppRequirementsReqIdRoute,
   AppSilosSiloIdRoute: AppSilosSiloIdRoute,
   AppRequirementsIndexRoute: AppRequirementsIndexRoute,
   AppSilosIndexRoute: AppSilosIndexRoute,
