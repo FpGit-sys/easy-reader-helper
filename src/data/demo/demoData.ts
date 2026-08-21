@@ -92,7 +92,7 @@ const TITULOS: { categoria: string; titulo: string }[] = [
   ["Ações corretivas", "Fluxo interno de tratamento de pendências definido"],
   ["Ações corretivas", "Prazos internos de ação corretiva monitorados"],
   ["Ações corretivas", "Verificação de eficácia de ação corretiva registrada"],
-].map(([categoria, titulo]) => ({ categoria, titulo }));
+].map(([categoria, titulo]) => ({ categoria: categoria!, titulo: titulo! }));
 
 const PENDENTES = [1, 7, 12, 18, 22, 27, 31, 35, 39, 44, 49];
 const CRITICOS = [10, 20, 40, 45];
@@ -156,8 +156,8 @@ export function buildDemoState(): AppState {
     const siloIds = isCritico
       ? ["silo-03"]
       : isPendente
-        ? [silos[(i % 4) + 1].id]
-        : [silos[i % 5].id];
+        ? [silos[(i % 4) + 1]!.id]
+        : [silos[i % 5]!.id];
 
     return {
       id: `req-${String(i + 1).padStart(3, "0")}`,
@@ -168,7 +168,7 @@ export function buildDemoState(): AppState {
       aplicavel: true,
       criticidade,
       status,
-      responsavel: RESPONSAVEIS[i % RESPONSAVEIS.length],
+      responsavel: RESPONSAVEIS[i % RESPONSAVEIS.length]!,
       prazo:
         status === "atendido"
           ? iso(addDays(hoje, 60 + (i % 40)))
@@ -220,12 +220,12 @@ export function buildDemoState(): AppState {
   ].map((i) => ({ ...i, data: iso(subDays(hoje, Number(i.data))) }));
 
   const nonconformities: Nonconformity[] = [
-    nc("nc-001", "NC-001", "Registro interno de umidade incompleto", "silo-02", "media", 26, 4, 1, requirements[7].id),
-    nc("nc-002", "NC-002", "Sinalização de área de risco ilegível", "silo-04", "media", 33, 9, 2, requirements[36].id),
-    nc("nc-003", "NC-003", "Evidência obrigatória não anexada", "silo-03", "alta", 48, -21, 0, requirements[40].id),
-    nc("nc-004", "NC-004", "Inspeção interna fora da periodicidade cadastrada", "silo-03", "alta", 34, -12, 0, requirements[10].id),
-    nc("nc-005", "NC-005", "Procedimento interno desatualizado", null, "baixa", 15, 20, 3, requirements[45].id),
-    nc("nc-006", "NC-006", "Registro de treinamento sem lista de presença", null, "media", 19, 6, 1, requirements[18].id),
+    nc("nc-001", "NC-001", "Registro interno de umidade incompleto", "silo-02", "media", 26, 4, 1, requirements[7]!.id),
+    nc("nc-002", "NC-002", "Sinalização de área de risco ilegível", "silo-04", "media", 33, 9, 2, requirements[36]!.id),
+    nc("nc-003", "NC-003", "Evidência obrigatória não anexada", "silo-03", "alta", 48, -21, 0, requirements[40]!.id),
+    nc("nc-004", "NC-004", "Inspeção interna fora da periodicidade cadastrada", "silo-03", "alta", 34, -12, 0, requirements[10]!.id),
+    nc("nc-005", "NC-005", "Procedimento interno desatualizado", null, "baixa", 15, 20, 3, requirements[45]!.id),
+    nc("nc-006", "NC-006", "Registro de treinamento sem lista de presença", null, "media", 19, 6, 1, requirements[18]!.id),
   ].map((n) => ({
     ...n,
     abertura: iso(subDays(hoje, Number(n.abertura))),
@@ -247,16 +247,16 @@ export function buildDemoState(): AppState {
   }));
 
   const evidence: Evidence[] = [
-    ev("evd-001", "Registro fotográfico — correia Silo 01", "foto", "silo-01", requirements[41].id, "insp-005", 18, 0),
-    ev("evd-002", "Relatório interno de manutenção — Silo 04", "documento", "silo-04", requirements[29].id, "insp-003", 47, 2),
-    ev("evd-003", "Registro de limpeza — Silo 05", "registro", "silo-05", requirements[9].id, "insp-004", 25, 3),
-    ev("evd-004", "Registro fotográfico — aeração Silo 02", "foto", "silo-02", requirements[24].id, "insp-002", 61, 1),
+    ev("evd-001", "Registro fotográfico — correia Silo 01", "foto", "silo-01", requirements[41]!.id, "insp-005", 18, 0),
+    ev("evd-002", "Relatório interno de manutenção — Silo 04", "documento", "silo-04", requirements[29]!.id, "insp-003", 47, 2),
+    ev("evd-003", "Registro de limpeza — Silo 05", "registro", "silo-05", requirements[9]!.id, "insp-004", 25, 3),
+    ev("evd-004", "Registro fotográfico — aeração Silo 02", "foto", "silo-02", requirements[24]!.id, "insp-002", 61, 1),
   ].map((e) => ({ ...e, data: iso(subDays(hoje, Number(e.data))) }));
 
-  requirements[41].evidencias = ["evd-001"];
-  requirements[29].evidencias = ["evd-002"];
-  requirements[9].evidencias = ["evd-003"];
-  requirements[24].evidencias = ["evd-004"];
+  requirements[41]!.evidencias = ["evd-001"];
+  requirements[29]!.evidencias = ["evd-002"];
+  requirements[9]!.evidencias = ["evd-003"];
+  requirements[24]!.evidencias = ["evd-004"];
 
   const audit = [
     { evento: "Ambiente demonstrativo carregado", objeto: "Sistema", objetoId: "demo", resumo: "52 critérios internos, 5 silos e 12 documentos fictícios carregados.", d: 0 },
@@ -308,7 +308,7 @@ function doc(
     nome,
     categoria,
     siloId,
-    responsavel: RESPONSAVEIS[respIdx],
+    responsavel: RESPONSAVEIS[respIdx]!,
     emissao: iso(subDays(hoje, emissaoDiasAtras)),
     validade,
     observacao: "Documento fictício de ambiente demonstrativo.",
@@ -338,7 +338,7 @@ function inspection(
     data: String(diasAtras),
     siloId,
     tipo,
-    responsavel: RESPONSAVEIS[respIdx],
+    responsavel: RESPONSAVEIS[respIdx]!,
     status: "concluida",
     itens,
     observacoes: "Inspeção interna fictícia registrada no ambiente demonstrativo.",
@@ -367,7 +367,7 @@ function nc(
     origem: "Inspeção interna",
     criticidade,
     status: "aberta",
-    responsavel: RESPONSAVEIS[respIdx],
+    responsavel: RESPONSAVEIS[respIdx]!,
     abertura: String(abertura),
     prazo: prazo as unknown as string | null,
     requirementId,
@@ -391,7 +391,7 @@ function act(
     titulo,
     ncId,
     siloId,
-    responsavel: RESPONSAVEIS[respIdx],
+    responsavel: RESPONSAVEIS[respIdx]!,
     prazo: prazo as unknown as string,
     prioridade,
     status,
@@ -416,7 +416,7 @@ function ev(
     nome,
     tipo,
     data: String(diasAtras),
-    responsavel: RESPONSAVEIS[respIdx],
+    responsavel: RESPONSAVEIS[respIdx]!,
     requirementId,
     siloId,
     inspectionId,
