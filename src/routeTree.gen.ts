@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteRouteImport } from './routes/app/route'
 import { Route as AppDashboardRouteImport } from './routes/app/dashboard'
 import { Route as AppDocumentsRouteImport } from './routes/app/documents'
+import { Route as AppInspectionsIndexRouteImport } from './routes/app/inspections/index'
 import { Route as AppRequirementsIndexRouteImport } from './routes/app/requirements/index'
 import { Route as AppRequirementsReqIdRouteImport } from './routes/app/requirements/$reqId'
 import { Route as AppSilosIndexRouteImport } from './routes/app/silos/index'
@@ -36,6 +37,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
 const AppDocumentsRoute = AppDocumentsRouteImport.update({
   id: '/documents',
   path: '/documents',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppInspectionsIndexRoute = AppInspectionsIndexRouteImport.update({
+  id: '/inspections/',
+  path: '/inspections/',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppRequirementsIndexRoute = AppRequirementsIndexRouteImport.update({
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/app/documents': typeof AppDocumentsRoute
   '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
   '/app/silos/$siloId': typeof AppSilosSiloIdRoute
+  '/app/inspections/': typeof AppInspectionsIndexRoute
   '/app/requirements/': typeof AppRequirementsIndexRoute
   '/app/silos/': typeof AppSilosIndexRoute
 }
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/app/documents': typeof AppDocumentsRoute
   '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
   '/app/silos/$siloId': typeof AppSilosSiloIdRoute
+  '/app/inspections': typeof AppInspectionsIndexRoute
   '/app/requirements': typeof AppRequirementsIndexRoute
   '/app/silos': typeof AppSilosIndexRoute
 }
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/app/documents': typeof AppDocumentsRoute
   '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
   '/app/silos/$siloId': typeof AppSilosSiloIdRoute
+  '/app/inspections/': typeof AppInspectionsIndexRoute
   '/app/requirements/': typeof AppRequirementsIndexRoute
   '/app/silos/': typeof AppSilosIndexRoute
 }
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/app/documents'
     | '/app/requirements/$reqId'
     | '/app/silos/$siloId'
+    | '/app/inspections/'
     | '/app/requirements/'
     | '/app/silos/'
   fileRoutesByTo: FileRoutesByTo
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/app/documents'
     | '/app/requirements/$reqId'
     | '/app/silos/$siloId'
+    | '/app/inspections'
     | '/app/requirements'
     | '/app/silos'
   id:
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/app/documents'
     | '/app/requirements/$reqId'
     | '/app/silos/$siloId'
+    | '/app/inspections/'
     | '/app/requirements/'
     | '/app/silos/'
   fileRoutesById: FileRoutesById
@@ -158,6 +170,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDocumentsRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/inspections/': {
+      id: '/app/inspections/'
+      path: '/inspections'
+      fullPath: '/app/inspections/'
+      preLoaderRoute: typeof AppInspectionsIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/requirements/': {
       id: '/app/requirements/'
       path: '/requirements'
@@ -194,6 +213,7 @@ interface AppRouteRouteChildren {
   AppDocumentsRoute: typeof AppDocumentsRoute
   AppRequirementsReqIdRoute: typeof AppRequirementsReqIdRoute
   AppSilosSiloIdRoute: typeof AppSilosSiloIdRoute
+  AppInspectionsIndexRoute: typeof AppInspectionsIndexRoute
   AppRequirementsIndexRoute: typeof AppRequirementsIndexRoute
   AppSilosIndexRoute: typeof AppSilosIndexRoute
 }
@@ -203,6 +223,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppDocumentsRoute: AppDocumentsRoute,
   AppRequirementsReqIdRoute: AppRequirementsReqIdRoute,
   AppSilosSiloIdRoute: AppSilosSiloIdRoute,
+  AppInspectionsIndexRoute: AppInspectionsIndexRoute,
   AppRequirementsIndexRoute: AppRequirementsIndexRoute,
   AppSilosIndexRoute: AppSilosIndexRoute,
 }
