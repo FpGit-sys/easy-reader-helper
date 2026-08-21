@@ -6,14 +6,14 @@ export type SourceType = "interno" | "externa_nao_verificada" | "externa_verific
 export interface SourceInfo {
   fonteTipo: SourceType;
   fonteNome: string;
-  fonteOrgao?: string;
-  fonteVersao?: string;
-  fonteReferencia?: string;
-  fonteURL?: string;
-  fonteConsultadaEm?: string;
+  fonteOrgao?: string | undefined;
+  fonteVersao?: string | undefined;
+  fonteReferencia?: string | undefined;
+  fonteURL?: string | undefined;
+  fonteConsultadaEm?: string | undefined;
   fonteVerificada: boolean;
-  verificadoPor?: string;
-  verificadoEm?: string;
+  verificadoPor?: string | undefined;
+  verificadoEm?: string | undefined;
 }
 
 export interface Requirement extends SourceInfo {
@@ -54,9 +54,9 @@ export interface StoredDocument {
   responsavel: string;
   emissao: string;
   validade: string | null;
-  arquivoNome?: string;
-  arquivoDataUrl?: string;
-  observacao?: string;
+  arquivoNome?: string | undefined;
+  arquivoDataUrl?: string | undefined;
+  observacao?: string | undefined;
 }
 
 export type InspectionStatus = "em_andamento" | "concluida";
@@ -64,7 +64,7 @@ export type InspectionStatus = "em_andamento" | "concluida";
 export interface InspectionItem {
   requirementId: string;
   resultado: "atendido" | "pendente" | "nao_aplicavel";
-  observacao?: string;
+  observacao?: string | undefined;
 }
 
 export interface Inspection {
@@ -95,7 +95,7 @@ export interface Nonconformity {
   responsavel: string;
   abertura: string;
   prazo: string | null;
-  requirementId?: string;
+  requirementId?: string | undefined;
 }
 
 export type ActionStatus =
@@ -123,7 +123,7 @@ export interface Evidence {
   id: string;
   nome: string;
   tipo: "foto" | "documento" | "registro";
-  dataUrl?: string;
+  dataUrl?: string | undefined;
   data: string;
   responsavel: string;
   requirementId: string | null;
