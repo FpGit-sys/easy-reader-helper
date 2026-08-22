@@ -11,9 +11,17 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteRouteImport } from './routes/app/route'
+import { Route as AppActionsRouteImport } from './routes/app/actions'
 import { Route as AppDashboardRouteImport } from './routes/app/dashboard'
 import { Route as AppDocumentsRouteImport } from './routes/app/documents'
+import { Route as AppDossierRouteImport } from './routes/app/dossier'
+import { Route as AppEvidenceRouteImport } from './routes/app/evidence'
+import { Route as AppFieldRouteImport } from './routes/app/field'
+import { Route as AppHistoryRouteImport } from './routes/app/history'
+import { Route as AppNonconformitiesRouteImport } from './routes/app/nonconformities'
+import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as AppInspectionsIndexRouteImport } from './routes/app/inspections/index'
+import { Route as AppInspectionsInspectionIdRouteImport } from './routes/app/inspections/$inspectionId'
 import { Route as AppInspectionsNewRouteImport } from './routes/app/inspections/new'
 import { Route as AppRequirementsIndexRouteImport } from './routes/app/requirements/index'
 import { Route as AppRequirementsReqIdRouteImport } from './routes/app/requirements/$reqId'
@@ -30,6 +38,11 @@ const AppRouteRoute = AppRouteRouteImport.update({
   path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppActionsRoute = AppActionsRouteImport.update({
+  id: '/actions',
+  path: '/actions',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -40,11 +53,47 @@ const AppDocumentsRoute = AppDocumentsRouteImport.update({
   path: '/documents',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppDossierRoute = AppDossierRouteImport.update({
+  id: '/dossier',
+  path: '/dossier',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppEvidenceRoute = AppEvidenceRouteImport.update({
+  id: '/evidence',
+  path: '/evidence',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppFieldRoute = AppFieldRouteImport.update({
+  id: '/field',
+  path: '/field',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppHistoryRoute = AppHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppNonconformitiesRoute = AppNonconformitiesRouteImport.update({
+  id: '/nonconformities',
+  path: '/nonconformities',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppInspectionsIndexRoute = AppInspectionsIndexRouteImport.update({
   id: '/inspections/',
   path: '/inspections/',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppInspectionsInspectionIdRoute =
+  AppInspectionsInspectionIdRouteImport.update({
+    id: '/inspections/$inspectionId',
+    path: '/inspections/$inspectionId',
+    getParentRoute: () => AppRouteRoute,
+  } as any)
 const AppInspectionsNewRoute = AppInspectionsNewRouteImport.update({
   id: '/inspections/new',
   path: '/inspections/new',
@@ -74,8 +123,16 @@ const AppSilosSiloIdRoute = AppSilosSiloIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
+  '/app/actions': typeof AppActionsRoute
   '/app/dashboard': typeof AppDashboardRoute
   '/app/documents': typeof AppDocumentsRoute
+  '/app/dossier': typeof AppDossierRoute
+  '/app/evidence': typeof AppEvidenceRoute
+  '/app/field': typeof AppFieldRoute
+  '/app/history': typeof AppHistoryRoute
+  '/app/nonconformities': typeof AppNonconformitiesRoute
+  '/app/settings': typeof AppSettingsRoute
+  '/app/inspections/$inspectionId': typeof AppInspectionsInspectionIdRoute
   '/app/inspections/new': typeof AppInspectionsNewRoute
   '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
   '/app/silos/$siloId': typeof AppSilosSiloIdRoute
@@ -86,8 +143,16 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
+  '/app/actions': typeof AppActionsRoute
   '/app/dashboard': typeof AppDashboardRoute
   '/app/documents': typeof AppDocumentsRoute
+  '/app/dossier': typeof AppDossierRoute
+  '/app/evidence': typeof AppEvidenceRoute
+  '/app/field': typeof AppFieldRoute
+  '/app/history': typeof AppHistoryRoute
+  '/app/nonconformities': typeof AppNonconformitiesRoute
+  '/app/settings': typeof AppSettingsRoute
+  '/app/inspections/$inspectionId': typeof AppInspectionsInspectionIdRoute
   '/app/inspections/new': typeof AppInspectionsNewRoute
   '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
   '/app/silos/$siloId': typeof AppSilosSiloIdRoute
@@ -99,8 +164,16 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
+  '/app/actions': typeof AppActionsRoute
   '/app/dashboard': typeof AppDashboardRoute
   '/app/documents': typeof AppDocumentsRoute
+  '/app/dossier': typeof AppDossierRoute
+  '/app/evidence': typeof AppEvidenceRoute
+  '/app/field': typeof AppFieldRoute
+  '/app/history': typeof AppHistoryRoute
+  '/app/nonconformities': typeof AppNonconformitiesRoute
+  '/app/settings': typeof AppSettingsRoute
+  '/app/inspections/$inspectionId': typeof AppInspectionsInspectionIdRoute
   '/app/inspections/new': typeof AppInspectionsNewRoute
   '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
   '/app/silos/$siloId': typeof AppSilosSiloIdRoute
@@ -113,8 +186,16 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/app'
+    | '/app/actions'
     | '/app/dashboard'
     | '/app/documents'
+    | '/app/dossier'
+    | '/app/evidence'
+    | '/app/field'
+    | '/app/history'
+    | '/app/nonconformities'
+    | '/app/settings'
+    | '/app/inspections/$inspectionId'
     | '/app/inspections/new'
     | '/app/requirements/$reqId'
     | '/app/silos/$siloId'
@@ -125,8 +206,16 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/app'
+    | '/app/actions'
     | '/app/dashboard'
     | '/app/documents'
+    | '/app/dossier'
+    | '/app/evidence'
+    | '/app/field'
+    | '/app/history'
+    | '/app/nonconformities'
+    | '/app/settings'
+    | '/app/inspections/$inspectionId'
     | '/app/inspections/new'
     | '/app/requirements/$reqId'
     | '/app/silos/$siloId'
@@ -137,8 +226,16 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/app'
+    | '/app/actions'
     | '/app/dashboard'
     | '/app/documents'
+    | '/app/dossier'
+    | '/app/evidence'
+    | '/app/field'
+    | '/app/history'
+    | '/app/nonconformities'
+    | '/app/settings'
+    | '/app/inspections/$inspectionId'
     | '/app/inspections/new'
     | '/app/requirements/$reqId'
     | '/app/silos/$siloId'
@@ -168,6 +265,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/actions': {
+      id: '/app/actions'
+      path: '/actions'
+      fullPath: '/app/actions'
+      preLoaderRoute: typeof AppActionsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/dashboard': {
       id: '/app/dashboard'
       path: '/dashboard'
@@ -182,11 +286,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDocumentsRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/dossier': {
+      id: '/app/dossier'
+      path: '/dossier'
+      fullPath: '/app/dossier'
+      preLoaderRoute: typeof AppDossierRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/evidence': {
+      id: '/app/evidence'
+      path: '/evidence'
+      fullPath: '/app/evidence'
+      preLoaderRoute: typeof AppEvidenceRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/field': {
+      id: '/app/field'
+      path: '/field'
+      fullPath: '/app/field'
+      preLoaderRoute: typeof AppFieldRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/history': {
+      id: '/app/history'
+      path: '/history'
+      fullPath: '/app/history'
+      preLoaderRoute: typeof AppHistoryRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/nonconformities': {
+      id: '/app/nonconformities'
+      path: '/nonconformities'
+      fullPath: '/app/nonconformities'
+      preLoaderRoute: typeof AppNonconformitiesRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/settings': {
+      id: '/app/settings'
+      path: '/settings'
+      fullPath: '/app/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/inspections/': {
       id: '/app/inspections/'
       path: '/inspections'
       fullPath: '/app/inspections/'
       preLoaderRoute: typeof AppInspectionsIndexRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/inspections/$inspectionId': {
+      id: '/app/inspections/$inspectionId'
+      path: '/inspections/$inspectionId'
+      fullPath: '/app/inspections/$inspectionId'
+      preLoaderRoute: typeof AppInspectionsInspectionIdRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/inspections/new': {
@@ -228,8 +381,16 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteRouteChildren {
+  AppActionsRoute: typeof AppActionsRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDocumentsRoute: typeof AppDocumentsRoute
+  AppDossierRoute: typeof AppDossierRoute
+  AppEvidenceRoute: typeof AppEvidenceRoute
+  AppFieldRoute: typeof AppFieldRoute
+  AppHistoryRoute: typeof AppHistoryRoute
+  AppNonconformitiesRoute: typeof AppNonconformitiesRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppInspectionsInspectionIdRoute: typeof AppInspectionsInspectionIdRoute
   AppInspectionsNewRoute: typeof AppInspectionsNewRoute
   AppRequirementsReqIdRoute: typeof AppRequirementsReqIdRoute
   AppSilosSiloIdRoute: typeof AppSilosSiloIdRoute
@@ -239,8 +400,16 @@ interface AppRouteRouteChildren {
 }
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
+  AppActionsRoute: AppActionsRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDocumentsRoute: AppDocumentsRoute,
+  AppDossierRoute: AppDossierRoute,
+  AppEvidenceRoute: AppEvidenceRoute,
+  AppFieldRoute: AppFieldRoute,
+  AppHistoryRoute: AppHistoryRoute,
+  AppNonconformitiesRoute: AppNonconformitiesRoute,
+  AppSettingsRoute: AppSettingsRoute,
+  AppInspectionsInspectionIdRoute: AppInspectionsInspectionIdRoute,
   AppInspectionsNewRoute: AppInspectionsNewRoute,
   AppRequirementsReqIdRoute: AppRequirementsReqIdRoute,
   AppSilosSiloIdRoute: AppSilosSiloIdRoute,
