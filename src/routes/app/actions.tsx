@@ -80,7 +80,7 @@ function ActionsPage() {
           onChange={(e) => setNovo((v) => ({ ...v, titulo: e.target.value }))}
         />
         <Select
-          value={novo.responsavel || undefined}
+          value={novo.responsavel}
           onValueChange={(v) => setNovo((n) => ({ ...n, responsavel: v }))}
         >
           <SelectTrigger aria-label="Responsável">
