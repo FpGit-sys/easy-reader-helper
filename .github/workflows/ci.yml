@@ -94,3 +94,39 @@ jobs:
 
       - name: Cross-tenant integration tests
         run: bun run test:integration
+
+      - name: HTTP security smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run dev > /tmp/silonr-vite.log 2>&1 &
+          APP_PID=$!
+          trap 'kill "$APP_PID" >/dev/null 2>&1 || true' EXIT
+
+          ready=0
+          for _ in $(seq 1 40); do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/login >/tmp/silonr-login.html; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            echo "SiloNR did not become ready"
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          curl --silent --show-error --dump-header /tmp/silonr-headers.txt --output /dev/null http://127.0.0.1:3000/login
+          grep -Eqi '^x-content-type-options:[[:space:]]*nosniff' /tmp/silonr-headers.txt
+          grep -Eqi '^x-frame-options:[[:space:]]*DENY' /tmp/silonr-headers.txt
+          grep -Eqi '^referrer-policy:[[:space:]]*no-referrer' /tmp/silonr-headers.txt
+
+          upload_status=$(curl --silent --show-error --output /tmp/silonr-upload.json --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/documents/upload)
+          if [ "$upload_status" != "401" ]; then
+            echo "Expected unauthenticated document upload to return 401, got $upload_status"
+            cat /tmp/silonr-upload.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
