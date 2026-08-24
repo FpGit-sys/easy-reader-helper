@@ -48,6 +48,9 @@ jobs:
       - name: Install JavaScript dependencies
         run: bun install
 
+      - name: Generate desktop icons
+        run: bun run tauri icon src-tauri/icons/app-icon.svg
+
       - name: Build Windows installers
         run: bun run desktop:build
 
