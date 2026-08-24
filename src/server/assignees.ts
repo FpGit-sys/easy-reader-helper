@@ -24,12 +24,8 @@ export async function assertAssignableUser(input: {
     );
 
   if (membershipsInScope.length === 0) throw new Error("INVALID_ASSIGNEE_SCOPE");
-  if (
-    input.requiredPermission &&
-    !membershipsInScope.some((membership) =>
-      can(membership.role as Role, input.requiredPermission!),
-    )
-  ) {
-    throw new Error(`ASSIGNEE_PERMISSION_REQUIRED:${input.requiredPermission}`);
+  const requiredPermission = input.requiredPermission ?? "actions.write";
+  if (!membershipsInScope.some((membership) => can(membership.role as Role, requiredPermission))) {
+    throw new Error(`ASSIGNEE_PERMISSION_REQUIRED:${requiredPermission}`);
   }
 }
