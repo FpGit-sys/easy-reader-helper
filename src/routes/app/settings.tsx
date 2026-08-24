@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Disclaimer, PageHeader } from "@/components/layout/PageHeader";
+import { NewRequirementForm } from "@/components/compliance/NewRequirementForm";
+
 import { DISCLAIMER } from "@/lib/formatting";
 import { getState, resetDemo, setState, useAppState } from "@/lib/storage/store";
 
