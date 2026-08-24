@@ -86,9 +86,16 @@ export const listProductionAuditEvents = createServerFn({ method: "GET" })
 
     return {
       rows: pageRows.map((row) => ({
-        ...row,
+        id: row.id,
+        actorUserId: row.actorUserId,
         actorName: userNames.get(row.actorUserId) ?? "Usuário",
+        eventType: row.eventType,
+        entityType: row.entityType,
+        entityId: row.entityId,
         occurredAt: row.occurredAt.toISOString(),
+        beforeJson: JSON.stringify(row.before ?? null),
+        afterJson: JSON.stringify(row.after ?? null),
+        metadataJson: JSON.stringify(row.metadata ?? {}),
       })),
       hasMore: rows.length > data.limit,
       nextOffset: data.offset + pageRows.length,
