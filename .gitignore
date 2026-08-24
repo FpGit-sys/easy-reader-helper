@@ -16,6 +16,28 @@ dist-ssr
 .nitro
 *.local
 
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Tauri / Rust build artifacts
+src-tauri/target/
+target/
+
+# Local databases and uploaded files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+.local-data/
+uploads/
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
