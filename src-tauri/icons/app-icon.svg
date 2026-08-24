@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SiloNR">
+  <rect width="512" height="512" rx="96" fill="#0f2f28"/>
+  <path d="M142 180c0-52 42-94 94-94h40c52 0 94 42 94 94v188H142V180Z" fill="#f3efe3"/>
+  <path d="M176 180h160" stroke="#0f2f28" stroke-width="26" stroke-linecap="round"/>
+  <path d="M188 252h136M188 314h136" stroke="#0f2f28" stroke-width="22" stroke-linecap="round"/>
+  <path d="M126 384h260" stroke="#d8a43f" stroke-width="30" stroke-linecap="round"/>
+  <circle cx="256" cy="180" r="18" fill="#d8a43f"/>
+</svg>
