@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Configurar SiloNR</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="brand-panel" aria-label="Sobre o SiloNR">
+        <div class="brand">SiloNR</div>
+        <div>
+          <span class="eyebrow">Configuração do aplicativo</span>
+          <h1>Conecte este computador ao ambiente da sua empresa.</h1>
+          <p>
+            Esta etapa é feita durante a implantação. O endereço deve ser fornecido pelo responsável
+            pela instalação do SiloNR.
+          </p>
+        </div>
+        <p class="footnote">
+          O SiloNR apoia a gestão de documentos, inspeções, evidências e ações. Não substitui
+          responsável técnico, auditoria ou fiscalização oficial.
+        </p>
+      </section>
+
+      <section class="form-panel">
+        <form id="server-form" class="card">
+          <div class="lock" aria-hidden="true">✓</div>
+          <h2>Servidor SiloNR</h2>
+          <p class="muted">
+            Em produção, utilize exclusivamente o endereço HTTPS entregue na implantação.
+          </p>
+
+          <label for="server-url">Endereço do servidor</label>
+          <input
+            id="server-url"
+            name="server-url"
+            type="url"
+            inputmode="url"
+            autocomplete="url"
+            placeholder="https://silonr.suaempresa.com.br"
+            required
+          />
+
+          <div id="error" class="error" role="alert" hidden></div>
+          <button id="connect" type="submit">Conectar com segurança</button>
+
+          <p class="help">
+            HTTP só é aceito para <code>localhost</code> em desenvolvimento. O aplicativo não grava
+            usuário ou senha nesta tela.
+          </p>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>
