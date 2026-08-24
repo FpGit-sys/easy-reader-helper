@@ -137,6 +137,7 @@ export const createProductionAction = createServerFn({ method: "POST" })
       organizationId: data.organizationId,
       facilityId: data.facilityId,
       userId: data.responsibleUserId,
+      requiredPermission: "actions.write",
     });
 
     const db = getDb();
@@ -236,6 +237,7 @@ export const updateProductionAction = createServerFn({ method: "POST" })
         organizationId: data.organizationId,
         facilityId: data.facilityId,
         userId: data.responsibleUserId,
+        requiredPermission: "actions.write",
       });
     }
 
