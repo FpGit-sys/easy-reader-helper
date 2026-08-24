@@ -201,11 +201,14 @@ export const Route = createFileRoute("/api/documents/upload")({
           });
           databaseCommitted = true;
 
-          return json({
-            id: documentId,
-            version: versionNumber,
-            sha256: digest,
-          });
+          return json(
+            {
+              id: documentId,
+              version: versionNumber,
+              sha256: digest,
+            },
+            200,
+          );
         } catch (error) {
           if (objectKey && !databaseCommitted) {
             await deletePrivateObject(objectKey).catch(() => undefined);
