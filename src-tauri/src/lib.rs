@@ -99,7 +99,7 @@ pub fn run() {
             connect_to_server
         ])
         .setup(|app| {
-            if let Some(config) = read_config(app.handle())? {
+            if let Ok(Some(config)) = read_config(app.handle()) {
                 if let Ok(url) = validate_server_url(&config.server_url) {
                     if let Some(window) = app.get_webview_window("main") {
                         window.navigate(url)?;
