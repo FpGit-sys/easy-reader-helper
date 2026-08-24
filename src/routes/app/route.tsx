@@ -17,6 +17,7 @@ const PRODUCTION_READY_PATHS = new Set([
   "/app/actions",
   "/app/history",
   "/app/dossier",
+  "/app/settings",
 ]);
 
 export const Route = createFileRoute("/app")({
