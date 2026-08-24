@@ -11,7 +11,7 @@ import {
   Users,
   Warehouse,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { EmptyState, PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -124,7 +123,7 @@ export function ProductionAdministrationPage() {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full table-dense">
-            <thead className="bg-muted/60 text-left"><tr><Th>Unidade</Th><Th>Localidade</Th><Th>Status</Th><Th /></tr></thead>
+            <thead className="bg-muted/60 text-left"><tr><Th>Unidade</Th><Th>Localidade</Th><Th>Status</Th><Th><span className="sr-only">Ações</span></Th></tr></thead>
             <tbody>
               {data.facilities.map((facility) => (
                 <tr key={facility.id} className="border-t border-border">
@@ -151,7 +150,7 @@ export function ProductionAdministrationPage() {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full table-dense">
-            <thead className="bg-muted/60 text-left"><tr><Th>Usuário</Th><Th>Perfil</Th><Th>Escopo</Th><Th>Status</Th><Th /></tr></thead>
+            <thead className="bg-muted/60 text-left"><tr><Th>Usuário</Th><Th>Perfil</Th><Th>Escopo</Th><Th>Status</Th><Th><span className="sr-only">Ações</span></Th></tr></thead>
             <tbody>
               {data.members.map((member) => (
                 <tr key={member.id} className="border-t border-border">
@@ -281,14 +280,20 @@ function FacilityDialog({ value, organizationId, onClose, onChanged }: { value: 
   const [city, setCity] = useState(isNew ? "" : value.city ?? "");
   const [state, setState] = useState(isNew ? "" : value.state ?? "");
   const mutation = useMutation({
-    mutationFn: () => isNew
-      ? createProductionFacility({ data: { organizationId, facility: { name, city: city.trim() || null, state: state.trim() || null } } })
-      : updateProductionFacility({ data: { organizationId, facilityId: value.id, facility: { name, city: city.trim() || null, state: state.trim() || null } } }),
+    mutationFn: async () => {
+      if (isNew) {
+        await createProductionFacility({ data: { organizationId, facility: { name, city: city.trim() || null, state: state.trim() || null } } });
+      } else {
+        await updateProductionFacility({ data: { organizationId, facilityId: value.id, facility: { name, city: city.trim() || null, state: state.trim() || null } } });
+      }
+    },
     onSuccess: async () => { toast.success(isNew ? "Unidade criada." : "Unidade atualizada."); await onChanged(); },
     onError: (error) => toast.error(adminError(error)),
   });
   const archive = useMutation({
-    mutationFn: () => isNew ? Promise.resolve({ ok: false }) : archiveProductionFacility({ data: { organizationId, facilityId: value.id } }),
+    mutationFn: async () => {
+      if (!isNew) await archiveProductionFacility({ data: { organizationId, facilityId: value.id } });
+    },
     onSuccess: async () => { toast.success("Unidade desativada."); await onChanged(); },
     onError: (error) => toast.error(adminError(error)),
   });
@@ -323,9 +328,13 @@ function MemberDialog({ value, organizationId, facilities, onClose, onChanged }:
   const roleRequiresFacility = role === "gestor_unidade" || role === "inspetor";
   const validScope = !roleRequiresFacility || scopedFacility !== "todas";
   const mutation = useMutation({
-    mutationFn: () => isNew
-      ? createProductionMember({ data: { organizationId, name, email, temporaryPassword, role, facilityId: scopedFacility === "todas" ? null : scopedFacility } })
-      : updateProductionMember({ data: { organizationId, membershipId: value.id, role, facilityId: scopedFacility === "todas" ? null : scopedFacility, active } }),
+    mutationFn: async () => {
+      if (isNew) {
+        await createProductionMember({ data: { organizationId, name, email, temporaryPassword, role, facilityId: scopedFacility === "todas" ? null : scopedFacility } });
+      } else {
+        await updateProductionMember({ data: { organizationId, membershipId: value.id, role, facilityId: scopedFacility === "todas" ? null : scopedFacility, active } });
+      }
+    },
     onSuccess: async () => { toast.success(isNew ? "Usuário criado e acesso concedido." : "Acesso atualizado."); await onChanged(); },
     onError: (error) => toast.error(adminError(error)),
   });
