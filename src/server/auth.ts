@@ -33,9 +33,6 @@ export function getAuth() {
     },
     advanced: {
       useSecureCookies: env.NODE_ENV === "production",
-      database: {
-        joins: true,
-      },
     },
     plugins: [tanstackStartCookies()],
   });
