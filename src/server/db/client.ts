@@ -1,7 +1,10 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { getServerEnv } from "@/server/env";
-import * as schema from "./schema";
+import * as baseSchema from "./schema";
+import * as extensionSchema from "./schema.extensions";
+
+const schema = { ...baseSchema, ...extensionSchema };
 
 let pool: Pool | undefined;
 let database: ReturnType<typeof drizzle<typeof schema>> | undefined;
