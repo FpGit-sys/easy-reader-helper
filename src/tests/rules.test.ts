@@ -115,10 +115,11 @@ describe("regra de ação atrasada", () => {
     prazo: "2026-08-01",
     prioridade: "alta",
     status: "em_andamento",
-    evidenciaId: null,
+    evidenciaConclusaoId: null,
     observacoes: "",
-    criadaEm: "2026-07-01",
-  } as CorrectiveAction;
+    concluidaEm: null,
+  };
+
 
   it("detecta atraso e classifica prioridade alta como crítico", () => {
     const r = runOverdueActionRule(action, REF);
