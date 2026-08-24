@@ -2,10 +2,10 @@ import { and, desc, eq } from "drizzle-orm";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { requirePermission } from "@/server/access";
-import { writeAuditEvent } from "@/server/audit";
+import { makeAuditEventValues } from "@/server/audit";
 import { getAuth } from "@/server/auth";
 import { getDb } from "@/server/db/client";
-import { documents, documentVersions, silos } from "@/server/db/schema";
+import { auditEvents, documents, documentVersions, silos } from "@/server/db/schema";
 import { safeStorageFilename, sha256, validateDocumentUpload } from "@/server/files/policy";
 import {
   deletePrivateObject,
@@ -29,6 +29,7 @@ export const Route = createFileRoute("/api/documents/upload")({
     handlers: {
       POST: async ({ request }: { request: Request }) => {
         let objectKey: string | null = null;
+        let databaseCommitted = false;
         try {
           const session = await getAuth().api.getSession({ headers: request.headers });
           if (!session?.user?.id) return json({ error: "UNAUTHORIZED" }, 401);
@@ -125,6 +126,33 @@ export const Route = createFileRoute("/api/documents/upload")({
             : [];
           const versionNumber = (latestVersion[0]?.version ?? 0) + 1;
           const versionId = crypto.randomUUID();
+          const auditInput = {
+            organizationId: data.organizationId,
+            facilityId: data.facilityId,
+            actorUserId: session.user.id,
+            eventType: existing ? "document.version_uploaded" : "document.created",
+            entityType: "document",
+            entityId: documentId,
+            before: existing
+              ? {
+                  name: existing.name,
+                  category: existing.category,
+                  siloId: existing.siloId,
+                  activeVersionId: existing.activeVersionId,
+                }
+              : null,
+            after: {
+              name: data.name,
+              category: data.category,
+              siloId: data.siloId ?? null,
+              version: versionNumber,
+              filename: file.name,
+              mimeType: file.type,
+              sizeBytes: file.size,
+              sha256: digest,
+            },
+            userAgent: request.headers.get("user-agent"),
+          };
 
           await db.transaction(async (tx) => {
             if (!existing) {
@@ -168,34 +196,10 @@ export const Route = createFileRoute("/api/documents/upload")({
                 })
                 .where(eq(documents.id, existing.id));
             }
-          });
 
-          await writeAuditEvent({
-            organizationId: data.organizationId,
-            facilityId: data.facilityId,
-            actorUserId: session.user.id,
-            eventType: existing ? "document.version_uploaded" : "document.created",
-            entityType: "document",
-            entityId: documentId,
-            before: existing
-              ? {
-                  name: existing.name,
-                  category: existing.category,
-                  siloId: existing.siloId,
-                  activeVersionId: existing.activeVersionId,
-                }
-              : null,
-            after: {
-              name: data.name,
-              category: data.category,
-              siloId: data.siloId ?? null,
-              version: versionNumber,
-              filename: file.name,
-              mimeType: file.type,
-              sizeBytes: file.size,
-              sha256: digest,
-            },
+            await tx.insert(auditEvents).values(makeAuditEventValues(auditInput));
           });
+          databaseCommitted = true;
 
           return json({
             id: documentId,
@@ -203,7 +207,7 @@ export const Route = createFileRoute("/api/documents/upload")({
             sha256: digest,
           });
         } catch (error) {
-          if (objectKey) {
+          if (objectKey && !databaseCommitted) {
             await deletePrivateObject(objectKey).catch(() => undefined);
           }
           const message = error instanceof Error ? error.message : "UPLOAD_FAILED";
