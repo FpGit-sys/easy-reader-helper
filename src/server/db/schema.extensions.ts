@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -57,12 +58,12 @@ export const requirementStates = pgTable(
   (table) => [
     index("requirement_states_facility_idx").on(table.facilityId),
     index("requirement_states_requirement_idx").on(table.requirementId),
-    uniqueIndex("requirement_states_scope_uidx").on(
-      table.organizationId,
-      table.facilityId,
-      table.requirementId,
-      table.siloId,
-    ),
+    uniqueIndex("requirement_states_facility_scope_uidx")
+      .on(table.organizationId, table.facilityId, table.requirementId)
+      .where(sql`${table.siloId} is null`),
+    uniqueIndex("requirement_states_silo_scope_uidx")
+      .on(table.organizationId, table.facilityId, table.requirementId, table.siloId)
+      .where(sql`${table.siloId} is not null`),
   ],
 );
 
