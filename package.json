@@ -20,6 +20,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "auth:migrate": "npx auth@latest migrate",
+    "tenant:provision": "bun run scripts/provision-tenant.ts",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build"
