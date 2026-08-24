@@ -21,6 +21,10 @@ on:
       - "bun.lock"
       - ".github/workflows/desktop-windows.yml"
 
+concurrency:
+  group: silonr-windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
