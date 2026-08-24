@@ -19,6 +19,18 @@ function createAuthInstance() {
       maxPasswordLength: 128,
       revokeSessionsOnPasswordReset: true,
     },
+    rateLimit: {
+      enabled: env.NODE_ENV === "production",
+      window: 60,
+      max: 100,
+      customRules: {
+        "/sign-in/email": {
+          window: 60,
+          max: 10,
+        },
+      },
+      storage: "memory",
+    },
     session: {
       expiresIn: 60 * 60 * 12,
       updateAge: 60 * 60,
