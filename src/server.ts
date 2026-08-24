@@ -46,7 +46,7 @@ function isH3SwallowedErrorBody(body: string): boolean {
 }
 
 function harden(response: Response) {
-  return withSecurityHeaders(response, { production: process.env.NODE_ENV === "production" });
+  return withSecurityHeaders(response, { production: process.env["NODE_ENV"] === "production" });
 }
 
 export default {
