@@ -9,6 +9,7 @@ const PRODUCTION_READY_PATHS = new Set([
   "/app/silos",
   "/app/silos/",
   "/app/files",
+  "/app/criteria",
 ]);
 
 export const Route = createFileRoute("/app")({
@@ -26,6 +27,10 @@ export const Route = createFileRoute("/app")({
 
     if (location.pathname === "/app/documents") {
       throw redirect({ to: "/app/files" });
+    }
+
+    if (location.pathname === "/app/requirements" || location.pathname.startsWith("/app/requirements/")) {
+      throw redirect({ to: "/app/criteria" });
     }
 
     if (location.pathname.startsWith("/app/silos/") && location.pathname !== "/app/silos/") {
