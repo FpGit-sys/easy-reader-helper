@@ -3,6 +3,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -12,9 +13,11 @@ import {
 } from "drizzle-orm/pg-core";
 import {
   facilities,
+  inspections,
   organizations,
   requirements,
   requirementStatus,
+  requirementVersions,
   silos,
 } from "./schema";
 
@@ -64,6 +67,40 @@ export const requirementStates = pgTable(
     uniqueIndex("requirement_states_silo_scope_uidx")
       .on(table.organizationId, table.facilityId, table.requirementId, table.siloId)
       .where(sql`${table.siloId} is not null`),
+  ],
+);
+
+/**
+ * Frozen checklist definition captured when an inspection starts.
+ * It prevents later edits to requirement titles, source metadata or active
+ * versions from silently changing what the inspector was asked to assess.
+ */
+export const inspectionChecklistSnapshots = pgTable(
+  "inspection_checklist_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    inspectionId: uuid("inspection_id")
+      .notNull()
+      .references(() => inspections.id, { onDelete: "cascade" }),
+    requirementId: uuid("requirement_id")
+      .notNull()
+      .references(() => requirements.id, { onDelete: "restrict" }),
+    requirementVersionId: uuid("requirement_version_id")
+      .notNull()
+      .references(() => requirementVersions.id, { onDelete: "restrict" }),
+    ordinal: integer("ordinal").notNull(),
+    snapshot: jsonb("snapshot").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("inspection_checklist_snapshot_inspection_idx").on(table.inspectionId),
+    uniqueIndex("inspection_checklist_snapshot_req_uidx").on(
+      table.inspectionId,
+      table.requirementId,
+    ),
   ],
 );
 
