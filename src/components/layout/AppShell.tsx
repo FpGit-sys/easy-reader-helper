@@ -51,6 +51,7 @@ const PRODUCTION_NAV = [
   { to: "/app/actions", label: "Ações corretivas", Icon: Wrench },
   { to: "/app/dossier", label: "Dossiê", Icon: FolderCheck },
   { to: "/app/history", label: "Histórico", Icon: History },
+  { to: "/app/settings", label: "Administração", Icon: Settings },
 ] as const;
 
 type NavItem = (typeof DEMO_NAV)[number] | (typeof PRODUCTION_NAV)[number];
@@ -137,12 +138,13 @@ function ProductionShell({
         .filter(Boolean)
         .join(" — ")
     : "";
-  const productionNav = PRODUCTION_NAV.filter(
-    (item) =>
-      item.to !== "/app/history" ||
-      !workspaceState.workspace ||
-      can(workspaceState.workspace.role as Role, "audit.read"),
-  );
+  const role = workspaceState.workspace?.role as Role | undefined;
+  const productionNav = PRODUCTION_NAV.filter((item) => {
+    if (!role) return true;
+    if (item.to === "/app/history") return can(role, "audit.read");
+    if (item.to === "/app/settings") return can(role, "users.manage");
+    return true;
+  });
 
   return (
     <ShellFrame
