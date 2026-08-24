@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { hydrateStore, resetDemo, useAppState } from "@/lib/storage/store";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/lib/workspace";
+import { can, type Role } from "@/server/rbac";
 
 const DEMO_NAV = [
   { to: "/app/dashboard", label: "Visão geral", Icon: Gauge },
@@ -48,6 +49,8 @@ const PRODUCTION_NAV = [
   { to: "/app/inspections", label: "Inspeções", Icon: ClipboardCheck },
   { to: "/app/nonconformities", label: "Não conformidades", Icon: AlertTriangle },
   { to: "/app/actions", label: "Ações corretivas", Icon: Wrench },
+  { to: "/app/dossier", label: "Dossiê", Icon: FolderCheck },
+  { to: "/app/history", label: "Histórico", Icon: History },
 ] as const;
 
 type NavItem = (typeof DEMO_NAV)[number] | (typeof PRODUCTION_NAV)[number];
@@ -134,12 +137,18 @@ function ProductionShell({
         .filter(Boolean)
         .join(" — ")
     : "";
+  const productionNav = PRODUCTION_NAV.filter(
+    (item) =>
+      item.to !== "/app/history" ||
+      !workspaceState.workspace ||
+      can(workspaceState.workspace.role as Role, "audit.read"),
+  );
 
   return (
     <ShellFrame
       open={open}
       setOpen={setOpen}
-      nav={PRODUCTION_NAV}
+      nav={productionNav}
       unitContent={
         workspaceState.loading ? (
           <p className="text-xs text-sidebar-foreground/70">Carregando acessos…</p>
@@ -181,7 +190,7 @@ function ProductionShell({
       }
       footer={user?.name || user?.email ? `${user?.name ?? user?.email}` : "Usuário autenticado"}
       topbar={<ProductionTopbar onMenu={() => setOpen(true)} />}
-      bottomNav={<BottomNav nav={PRODUCTION_NAV} />}
+      bottomNav={<BottomNav nav={productionNav} />}
     >
       {children}
     </ShellFrame>
