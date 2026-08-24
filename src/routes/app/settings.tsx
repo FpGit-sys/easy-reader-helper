@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Disclaimer, PageHeader } from "@/components/layout/PageHeader";
+import { NewRequirementForm } from "@/components/compliance/NewRequirementForm";
+
 import { DISCLAIMER } from "@/lib/formatting";
 import { getState, resetDemo, setState, useAppState } from "@/lib/storage/store";
 
@@ -127,6 +129,17 @@ function SettingsPage() {
           </Button>
         </div>
       </section>
+
+      <section className="mt-5 space-y-3 rounded border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold">Novo critério interno</h2>
+        <p className="text-sm text-muted-foreground">
+          Critérios cadastrados entram na matriz e no cálculo do índice interno. Nenhum critério
+          pode ser marcado como norma verificada sem a fonte completa.
+        </p>
+        <NewRequirementForm responsaveis={form.responsaveis} />
+      </section>
+
+
 
       <section className="mt-5 space-y-3 rounded border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Dados</h2>
