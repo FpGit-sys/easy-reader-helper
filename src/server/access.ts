@@ -64,16 +64,6 @@ export async function requirePermission(input: {
   permission: Permission;
 }) {
   const scope = await resolveAccessScope(input);
-
-  // Company administrators may maintain only the tenant that was already
-  // resolved above from an active organization-wide membership. The raw
-  // organization.manage capability remains reserved to super_admin so it
-  // cannot be confused with a platform-wide administrative role.
-  if (input.permission === "organization.manage" && scope.role === "admin_empresa") {
-    assertPermission(scope.role, "users.manage");
-    return scope;
-  }
-
   assertPermission(scope.role, input.permission);
   return scope;
 }
