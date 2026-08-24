@@ -129,6 +129,17 @@ function SettingsPage() {
       </section>
 
       <section className="mt-5 space-y-3 rounded border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold">Novo critério interno</h2>
+        <p className="text-sm text-muted-foreground">
+          Critérios cadastrados entram na matriz e no cálculo do índice interno. Nenhum critério
+          pode ser marcado como norma verificada sem a fonte completa.
+        </p>
+        <NewRequirementForm responsaveis={form.responsaveis} />
+      </section>
+
+
+
+      <section className="mt-5 space-y-3 rounded border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Dados</h2>
         <p className="text-sm text-muted-foreground">
           Todos os dados ficam apenas neste navegador. Nenhuma informação é enviada para servidores.
