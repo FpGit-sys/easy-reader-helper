@@ -46,6 +46,8 @@ const PRODUCTION_NAV = [
   { to: "/app/criteria", label: "Matriz de requisitos", Icon: ListChecks },
   { to: "/app/files", label: "Documentos", Icon: FileText },
   { to: "/app/inspections", label: "Inspeções", Icon: ClipboardCheck },
+  { to: "/app/nonconformities", label: "Não conformidades", Icon: AlertTriangle },
+  { to: "/app/actions", label: "Ações corretivas", Icon: Wrench },
 ] as const;
 
 type NavItem = (typeof DEMO_NAV)[number] | (typeof PRODUCTION_NAV)[number];
