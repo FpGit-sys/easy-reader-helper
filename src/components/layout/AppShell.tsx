@@ -42,8 +42,9 @@ const DEMO_NAV = [
 ] as const;
 
 const PRODUCTION_NAV = [
-  { to: "/app/dashboard", label: "Visão geral", Icon: Gauge },
+  { to: "/app/overview", label: "Visão geral", Icon: Gauge },
   { to: "/app/silos", label: "Silos", Icon: Warehouse },
+  { to: "/app/files", label: "Documentos", Icon: FileText },
 ] as const;
 
 export function AppShell({
