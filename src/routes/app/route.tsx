@@ -10,6 +10,9 @@ const PRODUCTION_READY_PATHS = new Set([
   "/app/silos/",
   "/app/files",
   "/app/criteria",
+  "/app/inspections",
+  "/app/inspections/",
+  "/app/inspections/new",
 ]);
 
 export const Route = createFileRoute("/app")({
@@ -37,7 +40,12 @@ export const Route = createFileRoute("/app")({
       throw redirect({ to: "/app/silos" });
     }
 
-    if (!PRODUCTION_READY_PATHS.has(location.pathname)) {
+    const isInspectionPath =
+      location.pathname === "/app/inspections" ||
+      location.pathname === "/app/inspections/" ||
+      location.pathname.startsWith("/app/inspections/");
+
+    if (!PRODUCTION_READY_PATHS.has(location.pathname) && !isInspectionPath) {
       throw redirect({ to: "/app/overview" });
     }
 
