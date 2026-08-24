@@ -6,6 +6,7 @@ import { makeAuditEventValues } from "@/server/audit";
 import { getDb } from "@/server/db/client";
 import {
   auditEvents,
+  evidenceLinks,
   inspectionItems,
   inspections,
   nonconformities,
@@ -553,7 +554,7 @@ export const finalizeProductionInspection = createServerFn({ method: "POST" })
       if (!inspection) throw new Error("NOT_FOUND:INSPECTION");
       if (inspection.status !== "em_andamento") throw new Error("INSPECTION_LOCKED");
 
-      const [snapshots, answers] = await Promise.all([
+      const [snapshots, answers, linkedEvidence] = await Promise.all([
         tx
           .select()
           .from(inspectionChecklistSnapshots)
@@ -573,14 +574,46 @@ export const finalizeProductionInspection = createServerFn({ method: "POST" })
               eq(inspectionItems.inspectionId, inspection.id),
             ),
           ),
+        tx
+          .select({ requirementId: evidenceLinks.requirementId })
+          .from(evidenceLinks)
+          .where(
+            and(
+              eq(evidenceLinks.organizationId, data.organizationId),
+              eq(evidenceLinks.inspectionId, inspection.id),
+            ),
+          ),
       ]);
 
       if (snapshots.length === 0 || answers.length !== snapshots.length) {
         throw new Error("INSPECTION_CHECKLIST_INCOMPLETE");
       }
-      const answeredIds = new Set(answers.map((answer) => answer.requirementId));
-      if (snapshots.some((snapshot) => !answeredIds.has(snapshot.requirementId))) {
+      const answerByRequirement = new Map(answers.map((answer) => [answer.requirementId, answer]));
+      if (snapshots.some((snapshot) => !answerByRequirement.has(snapshot.requirementId))) {
         throw new Error("INSPECTION_CHECKLIST_INCOMPLETE");
+      }
+
+      const evidenceRequirements = new Set(
+        linkedEvidence
+          .map((link) => link.requirementId)
+          .filter((requirementId): requirementId is string => Boolean(requirementId)),
+      );
+      const missingRequiredEvidence = snapshots
+        .filter((snapshotRow) => {
+          const snapshot = safeSnapshot(snapshotRow.snapshot);
+          const answer = answerByRequirement.get(snapshotRow.requirementId)!;
+          return (
+            snapshot.evidenceRequired &&
+            answer.result !== "nao_aplicavel" &&
+            !evidenceRequirements.has(snapshotRow.requirementId)
+          );
+        })
+        .map((snapshotRow) => safeSnapshot(snapshotRow.snapshot).code);
+
+      if (missingRequiredEvidence.length > 0) {
+        throw new Error(
+          `INSPECTION_REQUIRED_EVIDENCE_MISSING:${missingRequiredEvidence.join(",")}`,
+        );
       }
 
       for (const answer of answers) {
@@ -683,6 +716,7 @@ export const finalizeProductionInspection = createServerFn({ method: "POST" })
             status: "concluida",
             syncRevision: updated.syncRevision,
             checklistItems: snapshots.length,
+            linkedEvidence: linkedEvidence.length,
             findingsCreated: issueAnswers.length,
             completedAt: completedAt.toISOString(),
           },
@@ -692,6 +726,7 @@ export const finalizeProductionInspection = createServerFn({ method: "POST" })
       return {
         status: "concluida" as const,
         syncRevision: updated.syncRevision,
+        linkedEvidence: linkedEvidence.length,
         findingsCreated: issueAnswers.length,
         completedAt: completedAt.toISOString(),
       };
