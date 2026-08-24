@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { admin } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { getPool } from "@/server/db/client";
 import { getServerEnv } from "@/server/env";
@@ -29,7 +30,13 @@ function createAuthInstance() {
     advanced: {
       useSecureCookies: env.NODE_ENV === "production",
     },
-    plugins: [tanstackStartCookies()],
+    plugins: [
+      admin({
+        defaultRole: "user",
+        adminRoles: ["admin"],
+      }),
+      tanstackStartCookies(),
+    ],
   });
 }
 
