@@ -6,6 +6,10 @@ const serverEnvSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL é obrigatória."),
   BETTER_AUTH_URL: z.string().url().default("http://localhost:3000"),
   BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET deve ter no mínimo 32 caracteres."),
+  ALLOW_PUBLIC_SIGNUP: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
   S3_ENDPOINT: z.string().url().optional().or(z.literal("")),
   S3_REGION: z.string().default("auto"),
   S3_BUCKET: z.string().min(1).default("silonr-private"),
