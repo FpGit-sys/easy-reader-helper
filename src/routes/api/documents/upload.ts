@@ -6,7 +6,12 @@ import { makeAuditEventValues } from "@/server/audit";
 import { getAuth } from "@/server/auth";
 import { getDb } from "@/server/db/client";
 import { auditEvents, documents, documentVersions, silos } from "@/server/db/schema";
-import { safeStorageFilename, sha256, validateDocumentUpload } from "@/server/files/policy";
+import {
+  safeStorageFilename,
+  sha256,
+  validateDocumentUpload,
+  validateFileContent,
+} from "@/server/files/policy";
 import {
   deletePrivateObject,
   makePrivateObjectKey,
@@ -99,6 +104,7 @@ export const Route = createFileRoute("/api/documents/upload")({
           }
 
           const bytes = new Uint8Array(await file.arrayBuffer());
+          validateFileContent(bytes, file.type);
           const digest = sha256(bytes);
           const documentId = existing?.id ?? crypto.randomUUID();
           objectKey = makePrivateObjectKey({
@@ -219,6 +225,7 @@ export const Route = createFileRoute("/api/documents/upload")({
           if (
             message === "FILE_SIZE_NOT_ALLOWED" ||
             message === "FILE_TYPE_NOT_ALLOWED" ||
+            message === "FILE_CONTENT_MISMATCH" ||
             message === "INVALID_FILE_NAME"
           ) {
             return json({ error: message }, 400);
