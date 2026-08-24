@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getDb, getPool } from "@/server/db/client";
 import { facilities, memberships, organizations } from "@/server/db/schema";
-import { resolveAccessScope } from "@/server/access";
+import { requirePermission, resolveAccessScope } from "@/server/access";
 
 const ids = {
   orgA: "10000000-0000-4000-8000-000000000001",
@@ -120,6 +120,37 @@ describe("isolamento multiempresa no banco", () => {
         userId: users.inactiveA,
         organizationId: ids.orgA,
         facilityId: ids.facilityA1,
+      }),
+    ).rejects.toThrow("FORBIDDEN:TENANT_SCOPE");
+  });
+
+  it("aplica RBAC depois de resolver o tenant no servidor", async () => {
+    await expect(
+      requirePermission({
+        userId: users.inspectorA,
+        organizationId: ids.orgA,
+        facilityId: ids.facilityA1,
+        permission: "inspections.execute",
+      }),
+    ).resolves.toMatchObject({ role: "inspetor" });
+
+    await expect(
+      requirePermission({
+        userId: users.inspectorA,
+        organizationId: ids.orgA,
+        facilityId: ids.facilityA1,
+        permission: "users.manage",
+      }),
+    ).rejects.toThrow("FORBIDDEN:users.manage");
+  });
+
+  it("não deixa uma permissão válida atravessar para outro tenant", async () => {
+    await expect(
+      requirePermission({
+        userId: users.adminA,
+        organizationId: ids.orgB,
+        facilityId: ids.facilityB1,
+        permission: "users.manage",
       }),
     ).rejects.toThrow("FORBIDDEN:TENANT_SCOPE");
   });
