@@ -65,11 +65,10 @@ export async function requirePermission(input: {
 }) {
   const scope = await resolveAccessScope(input);
 
-  // `organization.manage` remains reserved in the raw role matrix so it cannot
-  // be interpreted as a platform/global capability. A company administrator may
-  // nevertheless maintain only the organization for which resolveAccessScope
-  // has already proven an active organization-wide membership. Cross-tenant
-  // access still fails above with FORBIDDEN:TENANT_SCOPE.
+  // Company administrators may maintain only the tenant that was already
+  // resolved above from an active organization-wide membership. The raw
+  // organization.manage capability remains reserved to super_admin so it
+  // cannot be confused with a platform-wide administrative role.
   if (input.permission === "organization.manage" && scope.role === "admin_empresa") {
     assertPermission(scope.role, "users.manage");
     return scope;
