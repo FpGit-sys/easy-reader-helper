@@ -7,7 +7,6 @@ import {
   Gauge,
   History,
   Images,
-  LayoutGrid,
   ListChecks,
   Menu,
   MoreHorizontal,
@@ -20,11 +19,11 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { GuidedTour } from "@/components/layout/GuidedTour";
+import { Button } from "@/components/ui/button";
 import { hydrateStore, resetDemo, useAppState } from "@/lib/storage/store";
-import { useWorkspace } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
+import { useWorkspace } from "@/lib/workspace";
 
 const DEMO_NAV = [
   { to: "/app/dashboard", label: "Visão geral", Icon: Gauge },
@@ -44,8 +43,11 @@ const DEMO_NAV = [
 const PRODUCTION_NAV = [
   { to: "/app/overview", label: "Visão geral", Icon: Gauge },
   { to: "/app/silos", label: "Silos", Icon: Warehouse },
+  { to: "/app/criteria", label: "Matriz de requisitos", Icon: ListChecks },
   { to: "/app/files", label: "Documentos", Icon: FileText },
 ] as const;
+
+type NavItem = (typeof DEMO_NAV)[number] | (typeof PRODUCTION_NAV)[number];
 
 export function AppShell({
   children,
@@ -57,7 +59,7 @@ export function AppShell({
   user: { name?: string | null; email?: string | null } | null;
 }) {
   const [open, setOpen] = useState(false);
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
 
   useEffect(() => {
     if (demoMode) hydrateStore();
@@ -68,7 +70,7 @@ export function AppShell({
   }, [pathname]);
 
   return demoMode ? (
-    <DemoShell open={open} setOpen={setOpen} pathname={pathname}>
+    <DemoShell open={open} setOpen={setOpen}>
       {children}
     </DemoShell>
   ) : (
@@ -86,10 +88,9 @@ function DemoShell({
   children: ReactNode;
   open: boolean;
   setOpen: (open: boolean) => void;
-  pathname: string;
 }) {
-  const unidade = useAppState((s) => s.settings.unidadeNome);
-  const local = useAppState((s) => s.settings.unidadeLocal);
+  const unidade = useAppState((state) => state.settings.unidadeNome);
+  const local = useAppState((state) => state.settings.unidadeLocal);
 
   return (
     <ShellFrame
@@ -197,7 +198,7 @@ function ShellFrame({
   children: ReactNode;
   open: boolean;
   setOpen: (open: boolean) => void;
-  nav: readonly Array<{ to: string; label: string; Icon: typeof Gauge }>;
+  nav: ReadonlyArray<NavItem>;
   unitContent: ReactNode;
   footer: string;
   topbar: ReactNode;
@@ -278,7 +279,12 @@ function ShellFrame({
 function ProductionTopbar({ onMenu }: { onMenu: () => void }) {
   return (
     <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-border bg-card/95 px-4 py-2 backdrop-blur lg:px-8">
-      <button type="button" className="lg:hidden" onClick={onMenu} aria-label="Abrir menu de navegação">
+      <button
+        type="button"
+        className="lg:hidden"
+        onClick={onMenu}
+        aria-label="Abrir menu de navegação"
+      >
         <Menu className="size-5" />
       </button>
       <p className="text-xs font-medium text-muted-foreground">AMBIENTE DE PRODUÇÃO</p>
@@ -293,7 +299,12 @@ function ProductionTopbar({ onMenu }: { onMenu: () => void }) {
 function DemoBanner({ onMenu }: { onMenu: () => void }) {
   return (
     <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-warning/40 bg-warning/15 px-4 py-2 lg:px-8">
-      <button type="button" className="lg:hidden" onClick={onMenu} aria-label="Abrir menu de navegação">
+      <button
+        type="button"
+        className="lg:hidden"
+        onClick={onMenu}
+        aria-label="Abrir menu de navegação"
+      >
         <Menu className="size-5" />
       </button>
       <p className="text-xs font-semibold tracking-wide text-warning-foreground">
@@ -315,7 +326,7 @@ function DemoBanner({ onMenu }: { onMenu: () => void }) {
   );
 }
 
-function BottomNav({ nav }: { nav: readonly Array<{ to: string; label: string; Icon: typeof Gauge }> }) {
+function BottomNav({ nav }: { nav: ReadonlyArray<NavItem> }) {
   const [more, setMore] = useState(false);
   const quick = nav.slice(0, 3);
   return (
