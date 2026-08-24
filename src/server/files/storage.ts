@@ -19,7 +19,7 @@ function getStorageClient() {
 
   client = new S3Client({
     region: env.S3_REGION,
-    endpoint: env.S3_ENDPOINT || undefined,
+    ...(env.S3_ENDPOINT ? { endpoint: env.S3_ENDPOINT } : {}),
     forcePathStyle: env.S3_FORCE_PATH_STYLE,
     credentials: {
       accessKeyId: env.S3_ACCESS_KEY_ID,
