@@ -3,17 +3,10 @@ import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { getPool } from "@/server/db/client";
 import { getServerEnv } from "@/server/env";
 
-let instance: ReturnType<typeof betterAuth> | undefined;
-
-/**
- * Authentication is intentionally lazy so static builds and demo tooling do not
- * need production secrets. The first production auth request validates env vars.
- */
-export function getAuth() {
-  if (instance) return instance;
-
+function createAuthInstance() {
   const env = getServerEnv();
-  instance = betterAuth({
+
+  return betterAuth({
     database: getPool(),
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
@@ -36,6 +29,16 @@ export function getAuth() {
     },
     plugins: [tanstackStartCookies()],
   });
+}
 
+type AuthInstance = ReturnType<typeof createAuthInstance>;
+let instance: AuthInstance | null = null;
+
+/**
+ * Authentication is intentionally lazy so static builds and demo tooling do not
+ * need production secrets. The first production auth request validates env vars.
+ */
+export function getAuth(): AuthInstance {
+  instance ??= createAuthInstance();
   return instance;
 }
