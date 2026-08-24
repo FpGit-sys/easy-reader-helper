@@ -40,5 +40,10 @@ jobs:
       - name: Tests
         run: bun run test
 
+      - name: Validate database migrations can be generated
+        env:
+          DATABASE_URL: postgresql://silonr:silonr@127.0.0.1:5432/silonr
+        run: bun run db:generate
+
       - name: Build
         run: bun run build
