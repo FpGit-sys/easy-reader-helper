@@ -80,17 +80,25 @@ export function ProductionAdministrationPage() {
     ]);
   };
 
-  if (workspaceState.loading) return <Loading text="Carregando administração…" />;
+  if (workspaceState.loading) return <Loading text="Carregando configurações…" />;
   if (workspaceState.error) return <EmptyState title="Acesso indisponível" description={workspaceState.error} />;
   if (!workspace) return <EmptyState title="Selecione uma unidade" description="Escolha uma empresa e unidade para continuar." />;
+
   if (!canManage) {
     return (
-      <EmptyState
-        title="Administração restrita"
-        description="Somente administradores da empresa podem alterar unidades, usuários, perfis e dados cadastrais."
-      />
+      <div className="max-w-4xl">
+        <PageHeader
+          title="Minha conta"
+          subtitle={`${workspace.organizationName} · segurança e credenciais da sua conta`}
+        />
+        <SecurityCard />
+        <div className="mt-5 rounded border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+          Alterações de empresa, unidades, usuários e perfis são restritas aos administradores da empresa. Seu perfil atual é {roleLabel(workspace.role)}.
+        </div>
+      </div>
     );
   }
+
   if (query.isLoading) return <Loading text="Carregando dados da empresa…" />;
   if (query.error || !query.data) {
     return <EmptyState title="Não foi possível carregar a administração" description="Verifique sua conexão e permissões." />;
@@ -100,7 +108,7 @@ export function ProductionAdministrationPage() {
   return (
     <div className="max-w-6xl">
       <PageHeader
-        title="Administração"
+        title="Configurações e administração"
         subtitle={`${data.organization.name} · implantação, usuários, unidades e segurança da conta`}
       />
 
@@ -351,7 +359,7 @@ function MemberDialog({ value, organizationId, facilities, onClose, onChanged }:
           {isNew ? (
             <Field label="Senha temporária">
               <div className="flex gap-2"><Input type="text" value={temporaryPassword} onChange={(event) => setTemporaryPassword(event.target.value)} minLength={12} maxLength={128} /><Button type="button" variant="outline" onClick={() => setTemporaryPassword(generateTemporaryPassword())}>Gerar</Button></div>
-              <p className="mt-1 text-xs text-muted-foreground">Entregue esta senha ao usuário por um canal apropriado e peça que ele a troque em Administração → Segurança. O SiloNR não registra esta senha na trilha de auditoria.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Entregue esta senha ao usuário por um canal apropriado e peça que ele a troque em Configurações → Segurança. O SiloNR não registra esta senha na trilha de auditoria.</p>
             </Field>
           ) : null}
           <div className="grid gap-3 sm:grid-cols-2">
