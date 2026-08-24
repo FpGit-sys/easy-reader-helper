@@ -53,7 +53,9 @@ const ALL_PERMISSIONS: Permission[] = [
 
 export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
   super_admin: new Set(ALL_PERMISSIONS),
-  admin_empresa: new Set(ALL_PERMISSIONS.filter((p) => p !== "organization.manage")),
+  // Company admins may manage their own organization because every server operation
+  // is still tenant-scoped by organizationId. This does not grant cross-tenant access.
+  admin_empresa: new Set(ALL_PERMISSIONS),
   gestor_unidade: new Set([
     "facility.manage",
     "silos.read",
