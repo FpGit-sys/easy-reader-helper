@@ -15,6 +15,8 @@ const PRODUCTION_READY_PATHS = new Set([
   "/app/inspections/new",
   "/app/nonconformities",
   "/app/actions",
+  "/app/history",
+  "/app/dossier",
 ]);
 
 export const Route = createFileRoute("/app")({
