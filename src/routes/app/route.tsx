@@ -4,7 +4,12 @@ import { DEMO_MODE_ENABLED } from "@/lib/runtime-mode";
 import { WorkspaceProvider } from "@/lib/workspace";
 import { getSession } from "@/server/auth.functions";
 
-const PRODUCTION_READY_PATHS = new Set(["/app/overview", "/app/silos", "/app/silos/"]);
+const PRODUCTION_READY_PATHS = new Set([
+  "/app/overview",
+  "/app/silos",
+  "/app/silos/",
+  "/app/files",
+]);
 
 export const Route = createFileRoute("/app")({
   beforeLoad: async ({ location }) => {
@@ -17,6 +22,10 @@ export const Route = createFileRoute("/app")({
 
     if (location.pathname === "/app" || location.pathname === "/app/dashboard") {
       throw redirect({ to: "/app/overview" });
+    }
+
+    if (location.pathname === "/app/documents") {
+      throw redirect({ to: "/app/files" });
     }
 
     if (location.pathname.startsWith("/app/silos/") && location.pathname !== "/app/silos/") {
