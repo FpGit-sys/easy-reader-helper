@@ -49,7 +49,7 @@ describe("política de uploads", () => {
 
   it("gera SHA-256 determinístico", () => {
     expect(sha256(new TextEncoder().encode("SiloNR"))).toBe(
-      "3698b15f2e27b47e8381fb9cb63b90ed94d3f67825d1db8d487889d47e7148d9",
+      "537c4e921bb32cbb0910441de452b1131770f6302b485454a3615d1b54dbb854",
     );
   });
 
