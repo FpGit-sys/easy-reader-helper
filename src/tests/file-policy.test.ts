@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_DOCUMENT_BYTES,
+  MULTIPART_OVERHEAD_BYTES,
   detectSupportedMimeType,
   safeStorageFilename,
   sha256,
   validateDocumentUpload,
   validateEvidenceImage,
   validateFileContent,
+  validateRequestContentLength,
 } from "@/server/files/policy";
 
 describe("política de uploads", () => {
@@ -47,6 +49,24 @@ describe("política de uploads", () => {
     expect(() =>
       validateEvidenceImage({ filename: "evidencia.pdf", mimeType: "application/pdf", sizeBytes: 5000 }),
     ).toThrow("FILE_TYPE_NOT_ALLOWED");
+  });
+
+  it("rejeita multipart declarado acima do teto antes de materializar formData", () => {
+    const request = new Request("https://silonr.local/upload", {
+      method: "POST",
+      headers: {
+        "content-length": String(MAX_DOCUMENT_BYTES + MULTIPART_OVERHEAD_BYTES + 1),
+      },
+    });
+
+    expect(() => validateRequestContentLength(request, MAX_DOCUMENT_BYTES)).toThrow(
+      "REQUEST_BODY_TOO_LARGE",
+    );
+  });
+
+  it("não depende de Content-Length quando o transporte não o informa", () => {
+    const request = new Request("https://silonr.local/upload", { method: "POST" });
+    expect(() => validateRequestContentLength(request, MAX_DOCUMENT_BYTES)).not.toThrow();
   });
 
   it("valida assinatura real de PDF, JPEG, PNG e WebP", () => {
