@@ -128,7 +128,7 @@ export function ProductionHistoryPage() {
                   <Td>{row.actorName}</Td>
                   <Td><span className="font-medium">{eventLabel(row.eventType)}</span><p className="mt-0.5 text-xs text-muted-foreground">{row.eventType}</p></Td>
                   <Td>{entityLabel(row.entityType)}</Td>
-                  <Td className="max-w-56 truncate font-mono text-xs text-muted-foreground" title={row.entityId}>{row.entityId}</Td>
+                  <Td className="max-w-56 truncate font-mono text-xs text-muted-foreground">{row.entityId}</Td>
                   <Td><Button size="sm" variant="outline" onClick={() => setSelected(row)}><Eye className="size-3.5" aria-hidden="true" />Ver</Button></Td>
                 </tr>
               ))}
@@ -140,7 +140,7 @@ export function ProductionHistoryPage() {
       {data ? (
         <div className="mt-4 flex items-center justify-between gap-2">
           <Button variant="outline" disabled={offset === 0 || auditQuery.isFetching} onClick={() => setOffset(Math.max(0, offset - 100))}>Mais recentes</Button>
-          <p className="text-xs text-muted-foreground">Mostrando registros {offset + 1}–{offset + data.rows.length}</p>
+          <p className="text-xs text-muted-foreground">Mostrando registros {data.rows.length ? offset + 1 : 0}–{offset + data.rows.length}</p>
           <Button variant="outline" disabled={!data.hasMore || auditQuery.isFetching} onClick={() => setOffset(data.nextOffset)}>Mais antigos</Button>
         </div>
       ) : null}
@@ -164,22 +164,31 @@ function AuditDetailDialog({ row, onClose }: { row: AuditRow; onClose: () => voi
           <Info label="Identificador" value={row.entityId} mono />
           <Info label="ID do evento" value={row.id} mono />
         </dl>
-        <JsonSection title="Antes" value={row.before} />
-        <JsonSection title="Depois" value={row.after} />
-        <JsonSection title="Metadados" value={row.metadata} />
+        <JsonSection title="Antes" json={row.beforeJson} />
+        <JsonSection title="Depois" json={row.afterJson} />
+        <JsonSection title="Metadados" json={row.metadataJson} />
       </DialogContent>
     </Dialog>
   );
 }
 
-function JsonSection({ title, value }: { title: string; value: Record<string, unknown> | null }) {
-  if (!value || Object.keys(value).length === 0) return null;
+function JsonSection({ title, json }: { title: string; json: string }) {
+  const formatted = prettyJson(json);
+  if (formatted === "null" || formatted === "{}") return null;
   return (
     <section>
       <h3 className="mb-1 text-sm font-semibold">{title}</h3>
-      <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded border border-border bg-muted/30 p-3 text-xs leading-relaxed">{JSON.stringify(value, null, 2)}</pre>
+      <pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded border border-border bg-muted/30 p-3 text-xs leading-relaxed">{formatted}</pre>
     </section>
   );
+}
+
+function prettyJson(value: string) {
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
 }
 
 function Info({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
