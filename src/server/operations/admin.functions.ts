@@ -10,42 +10,18 @@ import { licenses } from "@/server/db/schema.extensions";
 import { requireSessionUser } from "@/server/session";
 
 const organizationScopeSchema = z.object({ organizationId: z.string().uuid() });
-const facilityFieldsSchema = z.object({
-  name: z.string().trim().min(2).max(200),
-  city: z.string().trim().max(120).nullable(),
-  state: z.string().trim().max(80).nullable(),
-});
+const facilityFieldsSchema = z.object({ name: z.string().trim().min(2).max(200), city: z.string().trim().max(120).nullable(), state: z.string().trim().max(80).nullable() });
 const memberRoleSchema = z.enum(["admin_empresa", "gestor_unidade", "responsavel_tecnico", "inspetor", "leitor"]);
-const updateOrganizationSchema = organizationScopeSchema.extend({
-  name: z.string().trim().min(2).max(200),
-  legalName: z.string().trim().max(240).nullable(),
-  document: z.string().trim().max(32).nullable(),
-});
+const updateOrganizationSchema = organizationScopeSchema.extend({ name: z.string().trim().min(2).max(200), legalName: z.string().trim().max(240).nullable(), document: z.string().trim().max(32).nullable() });
 const createFacilitySchema = organizationScopeSchema.extend({ facility: facilityFieldsSchema });
 const updateFacilitySchema = organizationScopeSchema.extend({ facilityId: z.string().uuid(), facility: facilityFieldsSchema });
 const archiveFacilitySchema = organizationScopeSchema.extend({ facilityId: z.string().uuid() });
-const createMemberSchema = organizationScopeSchema.extend({
-  name: z.string().trim().min(2).max(160),
-  email: z.string().email().max(320).transform((value) => value.toLowerCase()),
-  temporaryPassword: z.string().min(12).max(128),
-  role: memberRoleSchema,
-  facilityId: z.string().uuid().nullable(),
-});
-const updateMemberSchema = organizationScopeSchema.extend({
-  membershipId: z.string().uuid(),
-  role: memberRoleSchema,
-  facilityId: z.string().uuid().nullable(),
-  active: z.boolean(),
-});
+const createMemberSchema = organizationScopeSchema.extend({ name: z.string().trim().min(2).max(160), email: z.string().email().max(320).transform((value) => value.toLowerCase()), temporaryPassword: z.string().min(12).max(128), role: memberRoleSchema, facilityId: z.string().uuid().nullable() });
+const updateMemberSchema = organizationScopeSchema.extend({ membershipId: z.string().uuid(), role: memberRoleSchema, facilityId: z.string().uuid().nullable(), active: z.boolean() });
 
 async function authorizeCompanyAdministration(organizationId: string) {
   const session = await requireSessionUser();
-  const scope = await requirePermission({
-    userId: session.user.id,
-    organizationId,
-    facilityId: null,
-    permission: "users.manage",
-  });
+  const scope = await requirePermission({ userId: session.user.id, organizationId, facilityId: null, permission: "users.manage" });
   return { session, scope };
 }
 
@@ -98,9 +74,7 @@ export const getProductionAdministration = createServerFn({ method: "GET" }).val
   ]);
   if (!organization) throw new Error("NOT_FOUND:ORGANIZATION");
   const userIds = [...new Set(membershipRows.map((row) => row.userId))];
-  const authUsers = userIds.length
-    ? await getPool().query<{ id: string; name: string | null; email: string; emailVerified: boolean; role: string | null }>('select id, name, email, "emailVerified", role from "user" where id = any($1::text[])', [userIds])
-    : { rows: [] as Array<{ id: string; name: string | null; email: string; emailVerified: boolean; role: string | null }> };
+  const authUsers = userIds.length ? await getPool().query<{ id: string; name: string | null; email: string; emailVerified: boolean; role: string | null }>('select id, name, email, "emailVerified", role from "user" where id = any($1::text[])', [userIds]) : { rows: [] as Array<{ id: string; name: string | null; email: string; emailVerified: boolean; role: string | null }> };
   const usersById = new Map(authUsers.rows.map((user) => [user.id, user]));
   const facilitiesById = new Map(facilityRows.map((facility) => [facility.id, facility]));
   return {
@@ -108,20 +82,7 @@ export const getProductionAdministration = createServerFn({ method: "GET" }).val
     facilities: facilityRows,
     members: membershipRows.map((member) => {
       const user = usersById.get(member.userId);
-      return {
-        id: member.id,
-        userId: member.userId,
-        name: user?.name?.trim() || "Usuário",
-        email: user?.email ?? "",
-        emailVerified: user?.emailVerified ?? false,
-        authRole: user?.role ?? "user",
-        role: member.role,
-        facilityId: member.facilityId,
-        facilityName: member.facilityId ? facilitiesById.get(member.facilityId)?.name ?? "Unidade" : null,
-        active: member.active,
-        createdAt: member.createdAt.toISOString(),
-        isCurrentUser: member.userId === session.user.id,
-      };
+      return { id: member.id, userId: member.userId, name: user?.name?.trim() || "Usuário", email: user?.email ?? "", emailVerified: user?.emailVerified ?? false, authRole: user?.role ?? "user", role: member.role, facilityId: member.facilityId, facilityName: member.facilityId ? facilitiesById.get(member.facilityId)?.name ?? "Unidade" : null, active: member.active, createdAt: member.createdAt.toISOString(), isCurrentUser: member.userId === session.user.id };
     }),
     license: license ? { plan: license.plan, status: license.status, validFrom: license.validFrom.toISOString(), validUntil: license.validUntil?.toISOString() ?? null, maxFacilities: license.maxFacilities, maxUsers: license.maxUsers, offlineGraceDays: license.offlineGraceDays } : null,
     usage: { activeFacilities: facilityRows.filter((facility) => facility.active).length, activeUsers: new Set(membershipRows.filter((row) => row.active).map((row) => row.userId)).size },
