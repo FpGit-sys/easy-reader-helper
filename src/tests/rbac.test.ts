@@ -25,8 +25,16 @@ describe("RBAC de produção", () => {
     expect(can("admin_empresa", "organization.manage")).toBe(false);
   });
 
+  it("mantém gestão de usuários fora dos perfis operacionais", () => {
+    expect(can("gestor_unidade", "users.manage")).toBe(false);
+    expect(can("responsavel_tecnico", "users.manage")).toBe(false);
+    expect(can("inspetor", "users.manage")).toBe(false);
+    expect(can("leitor", "users.manage")).toBe(false);
+  });
+
   it("super admin possui permissões globais", () => {
     expect(can("super_admin", "organization.manage")).toBe(true);
+    expect(can("super_admin", "users.manage")).toBe(true);
     expect(can("super_admin", "requirements.publish")).toBe(true);
   });
 });
