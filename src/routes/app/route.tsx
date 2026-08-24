@@ -13,6 +13,8 @@ const PRODUCTION_READY_PATHS = new Set([
   "/app/inspections",
   "/app/inspections/",
   "/app/inspections/new",
+  "/app/nonconformities",
+  "/app/actions",
 ]);
 
 export const Route = createFileRoute("/app")({
