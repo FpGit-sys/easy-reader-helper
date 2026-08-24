@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requirePermission } from "@/server/access";
 import { getDb, getPool } from "@/server/db/client";
 import { memberships } from "@/server/db/schema";
+import { can, type Role } from "@/server/rbac";
 import { requireSessionUser } from "@/server/session";
 
 const scopeSchema = z.object({
@@ -42,7 +43,10 @@ export const listAssignableUsers = createServerFn({ method: "GET" })
       }
     }
 
-    const ids = [...effective.keys()];
+    const actionCapable = [...effective.values()].filter((member) =>
+      can(member.role as Role, "actions.write"),
+    );
+    const ids = actionCapable.map((member) => member.userId);
     if (ids.length === 0) return [];
 
     const authUsers = await getPool().query<{ id: string; name: string | null }>(
@@ -51,7 +55,7 @@ export const listAssignableUsers = createServerFn({ method: "GET" })
     );
     const names = new Map(authUsers.rows.map((user) => [user.id, user.name]));
 
-    return [...effective.values()]
+    return actionCapable
       .map((member) => ({
         id: member.userId,
         name: names.get(member.userId)?.trim() || "Usuário da unidade",
