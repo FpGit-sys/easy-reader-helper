@@ -13,8 +13,10 @@ function createAuthInstance() {
     trustedOrigins: [env.APP_URL],
     emailAndPassword: {
       enabled: true,
+      disableSignUp: !env.ALLOW_PUBLIC_SIGNUP,
       minPasswordLength: 12,
       maxPasswordLength: 128,
+      revokeSessionsOnPasswordReset: true,
     },
     session: {
       expiresIn: 60 * 60 * 12,
