@@ -21,28 +21,35 @@ function hashIp(ip: string | null | undefined) {
   return createHash("sha256").update(ip).digest("hex");
 }
 
+export function makeAuditEventValues(input: AuditEventInput) {
+  return {
+    organizationId: input.organizationId,
+    facilityId: input.facilityId ?? null,
+    actorUserId: input.actorUserId,
+    eventType: input.eventType,
+    entityType: input.entityType,
+    entityId: input.entityId,
+    ipHash: hashIp(input.ip),
+    userAgent: input.userAgent ?? null,
+    before: input.before ?? null,
+    after: input.after ?? null,
+    metadata: input.metadata ?? {},
+  } satisfies typeof auditEvents.$inferInsert;
+}
+
 /**
  * Application code only exposes INSERT for audit events. There is intentionally
  * no update/delete helper. Database credentials used by the runtime should also
  * be denied UPDATE/DELETE on this table in hardened deployments.
+ *
+ * For business mutations that must be atomic with their audit event, insert
+ * `makeAuditEventValues(input)` using the same Drizzle transaction.
  */
 export async function writeAuditEvent(input: AuditEventInput) {
   const db = getDb();
   const [event] = await db
     .insert(auditEvents)
-    .values({
-      organizationId: input.organizationId,
-      facilityId: input.facilityId ?? null,
-      actorUserId: input.actorUserId,
-      eventType: input.eventType,
-      entityType: input.entityType,
-      entityId: input.entityId,
-      ipHash: hashIp(input.ip),
-      userAgent: input.userAgent ?? null,
-      before: input.before ?? null,
-      after: input.after ?? null,
-      metadata: input.metadata ?? {},
-    })
+    .values(makeAuditEventValues(input))
     .returning({ id: auditEvents.id, occurredAt: auditEvents.occurredAt });
 
   if (!event) throw new Error("AUDIT_WRITE_FAILED");
