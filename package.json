@@ -1,5 +1,6 @@
 {
-  "name": "tanstack_start_ts",
+  "name": "silonr",
+  "version": "0.1.0",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -10,7 +11,13 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test": "vitest run"
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "tauri": "tauri",
+    "desktop:dev": "tauri dev",
+    "desktop:build": "tauri build"
   },
   "overrides": {
     "rolldown": "1.2.1"
@@ -73,7 +80,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
-    "@lovable.dev/vite-tanstack-config": "^2.15.0",
+    "@tauri-apps/cli": "^2.8.4",
     "@types/node": "^22.16.5",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
