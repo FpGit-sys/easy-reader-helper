@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 export const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
 export const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+export const MULTIPART_OVERHEAD_BYTES = 2 * 1024 * 1024;
 
 const ALLOWED_DOCUMENT_MIME = new Set([
   "application/pdf",
@@ -36,6 +37,23 @@ export function validateEvidenceImage(file: FileDescriptor): void {
   if (!ALLOWED_IMAGE_MIME.has(file.mimeType.toLowerCase())) {
     throw new Error("FILE_TYPE_NOT_ALLOWED");
   }
+}
+
+/**
+ * Rejects common oversized multipart requests before formData() materializes the
+ * body in memory. Requests without Content-Length are still protected by the
+ * per-file validation after parsing and must also be capped at the reverse proxy.
+ */
+export function validateRequestContentLength(
+  request: Request,
+  maxFileBytes: number,
+  overheadBytes = MULTIPART_OVERHEAD_BYTES,
+): void {
+  const raw = request.headers.get("content-length");
+  if (!raw) return;
+  const contentLength = Number(raw);
+  if (!Number.isFinite(contentLength) || contentLength < 0) throw new Error("INVALID_CONTENT_LENGTH");
+  if (contentLength > maxFileBytes + overheadBytes) throw new Error("REQUEST_BODY_TOO_LARGE");
 }
 
 /**
