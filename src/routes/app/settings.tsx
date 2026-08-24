@@ -15,13 +15,13 @@ export const Route = createFileRoute("/app/settings")({
   component: SettingsRoute,
   head: () => ({
     meta: [
-      { title: "Administração — SiloNR" },
+      { title: "Configurações — SiloNR" },
       {
         name: "description",
-        content: "Administração da empresa, unidades, usuários, perfis, licença e segurança da conta.",
+        content: "Segurança da conta e, para administradores, gestão da empresa, unidades, usuários, perfis e licença.",
       },
-      { property: "og:title", content: "Administração — SiloNR" },
-      { property: "og:description", content: "Configuração segura do ambiente SiloNR." },
+      { property: "og:title", content: "Configurações — SiloNR" },
+      { property: "og:description", content: "Conta e administração segura do ambiente SiloNR." },
     ],
   }),
 });
