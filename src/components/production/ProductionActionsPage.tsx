@@ -126,7 +126,7 @@ export function ProductionActionsPage() {
       ) : (
         <div className="overflow-x-auto rounded border border-border bg-card">
           <table className="w-full table-dense">
-            <thead className="bg-muted/70 text-left"><tr><Th>Código / ação</Th><Th>Origem</Th><Th>Silo</Th><Th>Responsável</Th><Th>Prazo</Th><Th>Prioridade</Th><Th>Evidências</Th><Th>Status</Th><Th /></tr></thead>
+            <thead className="bg-muted/70 text-left"><tr><Th>Código / ação</Th><Th>Origem</Th><Th>Silo</Th><Th>Responsável</Th><Th>Prazo</Th><Th>Prioridade</Th><Th>Evidências</Th><Th>Status</Th><Th><span className="sr-only">Abrir ação</span></Th></tr></thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id} className="border-t border-border">
@@ -268,7 +268,7 @@ function ActionDialog({ action, workspace, assignees, canWrite, onClose, onChang
           <div><Label>Status operacional</Label><Select disabled={!editable || action.status === "concluida"} value={action.status === "concluida" ? "concluida" : action.status} onValueChange={(value) => updateMutation.mutate(value as EditableStatus)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{action.status === "concluida" ? <SelectItem value="concluida">Concluída</SelectItem> : null}<SelectItem value="nao_iniciada">Não iniciada</SelectItem><SelectItem value="em_andamento">Em andamento</SelectItem><SelectItem value="aguardando_evidencia">Aguardando evidência</SelectItem><SelectItem value="cancelada">Cancelada</SelectItem></SelectContent></Select></div>
         </div>
         <div><Label htmlFor="detail-notes">Plano / observações</Label><Textarea id="detail-notes" disabled={!editable || action.status === "concluida"} rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} /></div>
-        {editable && action.status !== "concluida" ? <Button variant="outline" disabled={busy} onClick={() => updateMutation.mutate()}><CheckCircle2 className="size-4" />Salvar dados</Button> : null}
+        {editable && action.status !== "concluida" ? <Button variant="outline" disabled={busy} onClick={() => updateMutation.mutate(undefined)}><CheckCircle2 className="size-4" />Salvar dados</Button> : null}
 
         <section className="space-y-2 border-t border-border pt-4">
           <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-sm font-semibold">Evidências da conclusão</h3><p className="text-xs text-muted-foreground">É obrigatória ao menos uma evidência para concluir a ação.</p></div>{editable && action.status !== "concluida" ? <><input ref={fileRef} className="hidden" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadEvidence(file); }} /><Button variant="outline" disabled={uploading} onClick={() => fileRef.current?.click()}>{uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}Anexar evidência</Button></> : null}</div>
