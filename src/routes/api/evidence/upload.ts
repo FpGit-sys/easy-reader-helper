@@ -17,6 +17,7 @@ import {
   safeStorageFilename,
   sha256,
   validateEvidenceImage,
+  validateFileContent,
 } from "@/server/files/policy";
 import {
   deletePrivateObject,
@@ -118,6 +119,7 @@ export const Route = createFileRoute("/api/evidence/upload")({
           if (!snapshot) return json({ error: "EVIDENCE_REQUIREMENT_OUT_OF_SCOPE" }, 400);
 
           const bytes = new Uint8Array(await file.arrayBuffer());
+          validateFileContent(bytes, file.type);
           const digest = sha256(bytes);
           const evidenceId = crypto.randomUUID();
           objectKey = makePrivateObjectKey({
@@ -194,6 +196,7 @@ export const Route = createFileRoute("/api/evidence/upload")({
           if (
             message === "FILE_SIZE_NOT_ALLOWED" ||
             message === "FILE_TYPE_NOT_ALLOWED" ||
+            message === "FILE_CONTENT_MISMATCH" ||
             message === "INVALID_FILE_NAME"
           ) {
             return json({ error: message }, 400);
