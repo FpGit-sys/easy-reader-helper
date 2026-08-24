@@ -12,10 +12,12 @@ import {
   evidences,
 } from "@/server/db/schema";
 import {
+  MAX_DOCUMENT_BYTES,
   safeStorageFilename,
   sha256,
   validateDocumentUpload,
   validateFileContent,
+  validateRequestContentLength,
 } from "@/server/files/policy";
 import {
   deletePrivateObject,
@@ -40,6 +42,7 @@ export const Route = createFileRoute("/api/actions/evidence-upload")({
         try {
           const session = await getAuth().api.getSession({ headers: request.headers });
           if (!session?.user?.id) return json({ error: "UNAUTHORIZED" }, 401);
+          validateRequestContentLength(request, MAX_DOCUMENT_BYTES);
 
           const form = await request.formData();
           const file = form.get("file");
@@ -172,10 +175,12 @@ export const Route = createFileRoute("/api/actions/evidence-upload")({
           const message = error instanceof Error ? error.message : "ACTION_EVIDENCE_UPLOAD_FAILED";
           if (message === "UNAUTHORIZED") return json({ error: message }, 401);
           if (message.startsWith("FORBIDDEN")) return json({ error: message }, 403);
+          if (message === "REQUEST_BODY_TOO_LARGE") return json({ error: message }, 413);
           if (
             message === "FILE_SIZE_NOT_ALLOWED" ||
             message === "FILE_TYPE_NOT_ALLOWED" ||
             message === "FILE_CONTENT_MISMATCH" ||
+            message === "INVALID_CONTENT_LENGTH" ||
             message === "INVALID_FILE_NAME"
           ) {
             return json({ error: message }, 400);
