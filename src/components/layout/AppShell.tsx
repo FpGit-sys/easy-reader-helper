@@ -45,6 +45,7 @@ const PRODUCTION_NAV = [
   { to: "/app/silos", label: "Silos", Icon: Warehouse },
   { to: "/app/criteria", label: "Matriz de requisitos", Icon: ListChecks },
   { to: "/app/files", label: "Documentos", Icon: FileText },
+  { to: "/app/inspections", label: "Inspeções", Icon: ClipboardCheck },
 ] as const;
 
 type NavItem = (typeof DEMO_NAV)[number] | (typeof PRODUCTION_NAV)[number];
