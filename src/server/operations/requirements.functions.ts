@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requirePermission } from "@/server/access";
@@ -201,7 +201,14 @@ export const listProductionRequirements = createServerFn({ method: "GET" })
       const critical = applicable.filter((state) => state.status === "critico").length;
       const pending = applicable.filter((state) => state.status === "pendente").length;
       const attended = applicable.filter((state) => state.status === "atendido").length;
-      const status = critical > 0 ? "critico" : pending > 0 ? "pendente" : applicable.length > 0 ? "atendido" : "nao_aplicavel";
+      const status =
+        critical > 0
+          ? "critico"
+          : pending > 0
+            ? "pendente"
+            : applicable.length > 0
+              ? "atendido"
+              : "nao_aplicavel";
       return {
         ...row,
         updatedAt: row.updatedAt.toISOString(),
@@ -454,9 +461,10 @@ const TRANSITIONS: Record<z.infer<typeof lifecycleSchema>, z.infer<typeof lifecy
 export const transitionProductionRequirement = createServerFn({ method: "POST" })
   .validator(transitionInputSchema)
   .handler(async ({ data }) => {
-    const permission = data.target === "validado" || data.target === "publicado" || data.target === "obsoleto"
-      ? "requirements.publish"
-      : "requirements.write";
+    const permission =
+      data.target === "validado" || data.target === "publicado" || data.target === "obsoleto"
+        ? "requirements.publish"
+        : "requirements.write";
     const session = await authorize(data, permission);
     const db = getDb();
     const [current] = await db
@@ -509,45 +517,53 @@ export const updateProductionRequirementState = createServerFn({ method: "POST" 
   .validator(updateStateInputSchema)
   .handler(async ({ data }) => {
     const session = await authorize(data, "requirements.write");
-    if (data.siloId) await validateSiloScope(data.organizationId, data.facilityId, [data.siloId]);
+    if (data.siloId) {
+      await validateSiloScope(data.organizationId, data.facilityId, [data.siloId]);
+    }
+
     const db = getDb();
-    const [current] = await db
-      .select()
-      .from(requirementStates)
-      .where(
-        and(
-          eq(requirementStates.organizationId, data.organizationId),
-          eq(requirementStates.facilityId, data.facilityId),
-          eq(requirementStates.requirementId, data.requirementId),
-          data.siloId === null
-            ? eq(requirementStates.siloId, data.siloId)
-            : eq(requirementStates.siloId, data.siloId),
-        ),
-      )
-      .limit(1);
-    if (!current) throw new Error("NOT_FOUND:REQUIREMENT_STATE");
+    return db.transaction(async (tx) => {
+      const siloScope =
+        data.siloId === null
+          ? isNull(requirementStates.siloId)
+          : eq(requirementStates.siloId, data.siloId);
 
-    const nextStatus = data.applicable ? data.status : "nao_aplicavel";
-    const [after] = await db
-      .update(requirementStates)
-      .set({
-        applicable: data.applicable,
-        status: nextStatus,
-        dueAt: data.dueAt ? new Date(data.dueAt) : null,
-        lastAssessedAt: new Date(),
-        updatedBy: session.user.id,
-        revision: current.revision + 1,
-        updatedAt: new Date(),
-      })
-      .where(eq(requirementStates.id, current.id))
-      .returning();
-    if (!after) throw new Error("REQUIREMENT_STATE_UPDATE_FAILED");
+      const [current] = await tx
+        .select()
+        .from(requirementStates)
+        .where(
+          and(
+            eq(requirementStates.organizationId, data.organizationId),
+            eq(requirementStates.facilityId, data.facilityId),
+            eq(requirementStates.requirementId, data.requirementId),
+            siloScope,
+          ),
+        )
+        .limit(1);
+      if (!current) throw new Error("NOT_FOUND:REQUIREMENT_STATE");
 
-    await txlessAudit();
-    return { id: after.id, revision: after.revision };
+      const nextStatus = data.applicable ? data.status : "nao_aplicavel";
+      const [after] = await tx
+        .update(requirementStates)
+        .set({
+          applicable: data.applicable,
+          status: nextStatus,
+          dueAt: data.dueAt ? new Date(data.dueAt) : null,
+          lastAssessedAt: new Date(),
+          updatedBy: session.user.id,
+          revision: current.revision + 1,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(requirementStates.id, current.id),
+            eq(requirementStates.revision, current.revision),
+          ),
+        )
+        .returning();
+      if (!after) throw new Error("REQUIREMENT_STATE_CONFLICT");
 
-    async function txlessAudit() {
-      await getDb().insert(auditEvents).values(
+      await tx.insert(auditEvents).values(
         makeAuditEventValues({
           organizationId: data.organizationId,
           facilityId: data.facilityId,
@@ -569,5 +585,7 @@ export const updateProductionRequirementState = createServerFn({ method: "POST" 
           },
         }),
       );
-    }
+
+      return { id: after.id, revision: after.revision };
+    });
   });
