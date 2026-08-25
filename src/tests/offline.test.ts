@@ -6,7 +6,8 @@ import {
   pairingCodeHash,
   tokenHash,
 } from "@/server/offline/crypto";
-import { calculateOfflineAllowedUntil } from "@/server/offline/device-auth";\nimport { offlineEventSchema } from "@/server/offline/sync";
+import { calculateOfflineAllowedUntil } from "@/server/offline/device-auth";
+import { offlineEventSchema } from "@/server/offline/sync";
 
 describe("protocolo offline", () => {
   it("normaliza código de ativação sem depender da formatação exibida", () => {
