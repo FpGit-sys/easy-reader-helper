@@ -2,10 +2,12 @@ import { eq } from "drizzle-orm";
 import { getAuth } from "../src/server/auth";
 import { getDb, getPool } from "../src/server/db/client";
 import { facilities, memberships, organizations } from "../src/server/db/schema";
-import { licenses } from "../src/server/db/schema.extensions";
+import { devicePairingCodes, licenses } from "../src/server/db/schema.extensions";
+import { pairingCodeHash } from "../src/server/offline/crypto";
 
 const ADMIN_EMAIL = "ci-admin@silonr.test";
 const ADMIN_PASSWORD = "Silonr-CI-Password-2026!";
+export const CI_PAIRING_CODE = "CI2026-ACTIVE-OFFLINE";
 
 const ids = {
   organizationA: "30000000-0000-4000-8000-000000000001",
@@ -73,6 +75,14 @@ async function main() {
     maxUsers: 5,
     offlineGraceDays: 30,
   });
+  await db.insert(devicePairingCodes).values({
+    organizationId: ids.organizationA,
+    facilityId: ids.facilityA,
+    userId,
+    codeHash: pairingCodeHash(CI_PAIRING_CODE),
+    createdBy: userId,
+    expiresAt: new Date(Date.now() + 10 * 60_000),
+  });
 
   console.log(
     JSON.stringify({
@@ -81,6 +91,7 @@ async function main() {
       organizationB: ids.organizationB,
       facilityA: ids.facilityA,
       facilityB: ids.facilityB,
+      pairingCode: CI_PAIRING_CODE,
     }),
   );
 }
