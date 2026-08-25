@@ -1,0 +1,156 @@
+name: SiloNR DPAPI Integration
+
+on:
+  push:
+    branches:
+      - "production/**"
+    paths:
+      - ".github/workflows/dpapi-integration.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: silonr-dpapi-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply narrow DPAPI token integration
+        shell: python
+        run: |
+          from pathlib import Path
+
+          lib = Path("src-tauri/src/lib.rs")
+          offline = Path("src-tauri/src/offline_v2.rs")
+
+          lib_text = lib.read_text(encoding="utf-8")
+          offline_text = offline.read_text(encoding="utf-8")
+
+          if "mod secure_store;" not in lib_text:
+              anchor = "mod offline_v2;\n"
+              if lib_text.count(anchor) != 1:
+                  raise SystemExit("Unexpected lib.rs module anchor")
+              lib_text = lib_text.replace(anchor, anchor + "mod secure_store;\n", 1)
+
+          if "const DEVICE_TOKEN_META_KEY" not in offline_text:
+              anchor = "const PROTOCOL_VERSION: i32 = 1;\nconst MAX_EVIDENCE_BYTES: usize = 15 * 1024 * 1024;\n"
+              if offline_text.count(anchor) != 1:
+                  raise SystemExit("Unexpected offline constants anchor")
+              offline_text = offline_text.replace(
+                  anchor,
+                  anchor
+                  + 'const DEVICE_TOKEN_META_KEY: &str = "device_token";\n'
+                  + 'const DEVICE_TOKEN_PREFIX: &str = "dpapi:v1:";\n',
+                  1,
+              )
+
+          if "fn store_device_token" not in offline_text:
+              anchor = '''fn set_meta(conn: &Connection, key: &str, value: &str) -> Result<(), String> {
+              conn.execute(
+                  "INSERT INTO local_meta(key, value) VALUES(?1, ?2)
+                   ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                  params![key, value],
+              )
+              .map_err(|error| format!("Falha ao salvar configuração local: {error}"))?;
+              Ok(())
+          }
+          '''
+              if offline_text.count(anchor) != 1:
+                  raise SystemExit("Unexpected set_meta anchor")
+              helpers = anchor + '''
+          fn store_device_token(conn: &Connection, token: &str) -> Result<(), String> {
+              let protected = super::secure_store::protect(token)
+                  .map_err(|error| format!("SECURE_STORE_PROTECT_FAILED:{error}"))?;
+              set_meta(
+                  conn,
+                  DEVICE_TOKEN_META_KEY,
+                  &format!("{DEVICE_TOKEN_PREFIX}{protected}"),
+              )
+          }
+
+          fn load_device_token(conn: &Connection) -> Result<Option<String>, String> {
+              let Some(stored) = get_meta(conn, DEVICE_TOKEN_META_KEY)? else {
+                  return Ok(None);
+              };
+
+              if let Some(ciphertext) = stored.strip_prefix(DEVICE_TOKEN_PREFIX) {
+                  let token = super::secure_store::unprotect(ciphertext)
+                      .map_err(|error| format!("SECURE_STORE_UNPROTECT_FAILED:{error}"))?;
+                  return Ok(Some(token));
+              }
+
+              // Legacy migration: older desktop builds stored the device bearer token as
+              // plaintext in SQLite. The first authenticated/status read rewrites it with
+              // Windows DPAPI before returning it to memory.
+              store_device_token(conn, &stored)?;
+              Ok(Some(stored))
+          }
+
+          fn require_device_token(conn: &Connection) -> Result<String, String> {
+              load_device_token(conn)?.ok_or_else(|| "DEVICE_NOT_PAIRED".to_string())
+          }
+          '''
+              offline_text = offline_text.replace(anchor, helpers, 1)
+
+          old_require = 'get_meta(&conn, "device_token")?.ok_or_else(|| "DEVICE_NOT_PAIRED".to_string())?'
+          require_count = offline_text.count(old_require)
+          if require_count not in (0, 2):
+              raise SystemExit(f"Expected 0 or 2 plaintext token reads, found {require_count}")
+          offline_text = offline_text.replace(old_require, "require_device_token(&conn)?")
+
+          old_store = 'set_meta(&conn, "device_token", &activation.token)?;'
+          store_count = offline_text.count(old_store)
+          if store_count not in (0, 1):
+              raise SystemExit(f"Expected 0 or 1 plaintext token write, found {store_count}")
+          offline_text = offline_text.replace(old_store, "store_device_token(&conn, &activation.token)?;")
+
+          old_paired = 'let paired = get_meta(&conn, "device_token")?.is_some();'
+          paired_count = offline_text.count(old_paired)
+          if paired_count not in (0, 1):
+              raise SystemExit(f"Expected 0 or 1 plaintext token presence check, found {paired_count}")
+          offline_text = offline_text.replace(old_paired, "let paired = load_device_token(&conn)?.is_some();")
+
+          # Security invariant: after this migration the literal token key is declared once,
+          # and all access must go through the protected helpers above.
+          if offline_text.count('"device_token"') != 1:
+              raise SystemExit("Plain device_token key access remains outside secure helpers")
+          if "store_device_token(&conn, &activation.token)?;" not in offline_text:
+              raise SystemExit("Pairing does not store the token through secure storage")
+          if offline_text.count("require_device_token(&conn)?") != 2:
+              raise SystemExit("Bootstrap/sync are not both using secure token reads")
+          if "let paired = load_device_token(&conn)?.is_some();" not in offline_text:
+              raise SystemExit("Desktop status is not validating/migrating secure token state")
+
+          lib.write_text(lib_text, encoding="utf-8")
+          offline.write_text(offline_text, encoding="utf-8")
+
+      - name: Verify source invariant
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '^mod secure_store;' src-tauri/src/lib.rs
+          test "$(grep -o '"'"'device_token'"'"' src-tauri/src/offline_v2.rs | wc -l | tr -d ' ')" = "1"
+          grep -q 'store_device_token(&conn, &activation.token)' src-tauri/src/offline_v2.rs
+          test "$(grep -o 'require_device_token(&conn)' src-tauri/src/offline_v2.rs | wc -l | tr -d ' ')" = "2"
+
+      - name: Commit integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain -- src-tauri/src/lib.rs src-tauri/src/offline_v2.rs)" ]; then
+            echo "DPAPI integration already present."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src-tauri/src/lib.rs src-tauri/src/offline_v2.rs
+          git commit -m "Protect desktop device tokens with Windows DPAPI"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
