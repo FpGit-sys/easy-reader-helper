@@ -1,0 +1,141 @@
+name: SiloNR Backup Restore Drill
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "ops/**"
+      - "src/server/db/**"
+      - "drizzle.config.ts"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/backup-restore.yml"
+  push:
+    branches:
+      - "production/**"
+    paths:
+      - "ops/**"
+      - "src/server/db/**"
+      - "drizzle.config.ts"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/backup-restore.yml"
+
+concurrency:
+  group: silonr-backup-restore-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backup-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: silonr
+          POSTGRES_PASSWORD: silonr
+          POSTGRES_DB: silonr_backup_source
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U silonr -d silonr_backup_source"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://silonr:silonr@127.0.0.1:5432/silonr_backup_source
+      RESTORE_DATABASE_URL: postgresql://silonr:silonr@127.0.0.1:5432/silonr_restore_target
+      PGPASSWORD: silonr
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install JavaScript dependencies
+        run: bun install
+
+      - name: Ensure PostgreSQL 16 client tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v pg_dump >/dev/null 2>&1 || ! pg_dump --version | grep -q ' 16\.'; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client-16
+          fi
+          pg_dump --version
+          pg_restore --version
+          psql --version
+
+      - name: Create real application schema
+        run: bunx drizzle-kit push --force
+
+      - name: Seed restore sentinel
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE backup_restore_probe (
+            id integer PRIMARY KEY,
+            marker text NOT NULL,
+            created_at timestamptz NOT NULL DEFAULT now()
+          );
+          INSERT INTO backup_restore_probe(id, marker)
+          VALUES (1, 'SILONR_BACKUP_RESTORE_OK');
+          SQL
+
+      - name: Create and verify backup archive
+        id: backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ops/backup-postgres.sh ops/verify-postgres-backup.sh ops/restore-postgres.sh
+          mkdir -p "$RUNNER_TEMP/silonr-backups"
+          BACKUP_FILE="$(BACKUP_DIR="$RUNNER_TEMP/silonr-backups" BACKUP_RETENTION_DAYS=7 ./ops/backup-postgres.sh | tail -n 1)"
+          test -s "$BACKUP_FILE"
+          test -s "$BACKUP_FILE.sha256"
+          test -s "$BACKUP_FILE.meta"
+          ./ops/verify-postgres-backup.sh "$BACKUP_FILE"
+          echo "backup_file=$BACKUP_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Create isolated restore database
+        shell: bash
+        run: |
+          set -euo pipefail
+          createdb --host=127.0.0.1 --port=5432 --username=silonr silonr_restore_target
+
+      - name: Restore archive into isolated database
+        shell: bash
+        env:
+          RESTORE_CONFIRM: RESTORE_SILONR
+        run: |
+          set -euo pipefail
+          ./ops/restore-postgres.sh "${{ steps.backup.outputs.backup_file }}"
+
+      - name: Verify restored application data
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker="$(psql "$RESTORE_DATABASE_URL" -Atqc "SELECT marker FROM backup_restore_probe WHERE id = 1")"
+          if [ "$marker" != "SILONR_BACKUP_RESTORE_OK" ]; then
+            echo "Restore sentinel mismatch: '$marker'" >&2
+            exit 1
+          fi
+
+          table_count="$(psql "$RESTORE_DATABASE_URL" -Atqc "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'")"
+          if [ "$table_count" -lt 20 ]; then
+            echo "Expected the restored SiloNR schema to contain at least 20 public tables; got $table_count" >&2
+            exit 1
+          fi
+
+          echo "Restore drill approved: sentinel present and $table_count public tables restored."
