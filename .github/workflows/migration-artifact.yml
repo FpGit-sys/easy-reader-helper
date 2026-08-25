@@ -60,6 +60,20 @@ jobs:
           find drizzle -maxdepth 3 -type f -print | sort
           test -n "$(find drizzle -maxdepth 1 -type f -name '*.sql' -print -quit)"
 
+      - name: Reject pull request with uncommitted migration drift
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          drift="$(git status --porcelain -- drizzle)"
+          if [ -n "$drift" ]; then
+            echo "Schema and committed Drizzle migration are out of sync:" >&2
+            echo "$drift" >&2
+            echo "Generate and commit the migration before merging." >&2
+            exit 1
+          fi
+          echo "Committed migrations match the current schema."
+
       - name: Commit generated migration on production branch
         if: github.event_name == 'push'
         shell: bash
