@@ -60,9 +60,9 @@ Evidência atual: workflows `SiloNR Windows Desktop` e `SiloNR DPAPI Security`, 
 - [x] conflito explícito de revisão em vez de last-write-wins;
 - [x] conclusão somente depois de rascunho/evidência aceitos no servidor;
 - [x] E2E do protocolo offline contra servidor real de CI com PostgreSQL + MinIO: pareamento, bootstrap, snapshot, replay idempotente, conflito de revisão, upload de foto, replay da evidência, conclusão e criação de não conformidade;
-- [ ] E2E do processo Tauri/SQLite real → servidor cobrindo o ciclo completo e a retomada após indisponibilidade de rede.
+- [x] E2E do processo Tauri/SQLite real → servidor cobrindo o ciclo completo e a retomada após indisponibilidade de rede.
 
-Evidência: workflow `SiloNR Offline Protocol E2E`, além dos testes do servidor e do cliente desktop.
+Evidência: workflows `SiloNR Offline Protocol E2E` e `SiloNR Desktop Process E2E`, além dos testes do servidor e do cliente desktop. O processo real Tauri/SQLite passou em três execuções consecutivas cobrindo pareamento, indisponibilidade, persistência, restart, evidência, reconexão, conclusão e conflito.
 
 ## Gate E — Continuidade operacional
 
