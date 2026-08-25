@@ -1,0 +1,128 @@
+name: SiloNR Pilot Stack
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-compose.pilot.yml"
+      - "deploy/pilot/**"
+      - "src/server/env.ts"
+      - "src/server/files/storage.ts"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/pilot-stack.yml"
+  push:
+    branches:
+      - "production/**"
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-compose.pilot.yml"
+      - "deploy/pilot/**"
+      - "src/server/env.ts"
+      - "src/server/files/storage.ts"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/pilot-stack.yml"
+
+concurrency:
+  group: silonr-pilot-stack-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  SILONR_DOMAIN: silonr.invalid
+  SILONR_FILES_DOMAIN: files.silonr.invalid
+  ACME_EMAIL: ci@silonr.invalid
+  POSTGRES_DB: silonr
+  POSTGRES_USER: silonr
+  POSTGRES_PASSWORD: ci-postgres-password-not-for-production
+  BETTER_AUTH_SECRET: ci-pilot-stack-secret-at-least-32-characters
+  MINIO_ROOT_USER: silonr-ci-storage
+  MINIO_ROOT_PASSWORD: ci-minio-password-not-for-production
+  S3_BUCKET: silonr-private
+
+jobs:
+  container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create CI compose override
+        shell: bash
+        run: |
+          cat > /tmp/silonr-ci-override.yml <<'YAML'
+          services:
+            minio:
+              ports:
+                - "127.0.0.1:9000:9000"
+            app:
+              ports:
+                - "127.0.0.1:3000:3000"
+              environment:
+                APP_URL: http://127.0.0.1:3000
+                BETTER_AUTH_URL: http://127.0.0.1:3000
+                S3_PUBLIC_ENDPOINT: http://127.0.0.1:9000
+            migrate:
+              environment:
+                APP_URL: http://127.0.0.1:3000
+                BETTER_AUTH_URL: http://127.0.0.1:3000
+                S3_PUBLIC_ENDPOINT: http://127.0.0.1:9000
+            caddy:
+              profiles:
+                - public-edge
+          YAML
+
+      - name: Validate Compose model
+        run: docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml config --quiet
+
+      - name: Build migration and runtime images
+        run: docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml build migrate app
+
+      - name: Start database, private storage, migrations and app
+        run: docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml up -d --wait postgres minio create-bucket migrate app
+
+      - name: Verify production runtime health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/api/health/ready >/tmp/ready.json; then
+              cat /tmp/ready.json
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml ps
+          docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml logs --tail=200 app migrate postgres minio create-bucket
+          exit 1
+
+      - name: Verify public signup remains closed in production image
+        shell: bash
+        run: |
+          status=$(curl --silent --show-error --output /tmp/signup.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/auth/sign-up/email \
+            --header 'content-type: application/json' \
+            --data '{"name":"Intruso CI","email":"intruso@silonr.invalid","password":"Password-Should-Not-Register-2026!"}')
+          if [ "$status" = "200" ] || [ "$status" = "201" ]; then
+            echo "Public signup unexpectedly succeeded"
+            cat /tmp/signup.json
+            exit 1
+          fi
+          echo "Public signup blocked with HTTP $status"
+
+      - name: Show stack logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml logs --tail=250 || true
+
+      - name: Stop stack
+        if: always()
+        run: docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml down -v --remove-orphans || true
