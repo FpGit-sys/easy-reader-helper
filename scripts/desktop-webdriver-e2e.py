@@ -130,6 +130,8 @@ def stop_server() -> None:
 
 def start_driver() -> None:
     global driver_process
+    if driver_process and driver_process.poll() is None:
+        return
     driver = shutil.which("tauri-driver")
     if not driver:
         raise RuntimeError("tauri-driver is not available in PATH")
@@ -156,9 +158,25 @@ def stop_driver() -> None:
         except Exception:
             try:
                 os.killpg(driver_process.pid, signal.SIGKILL)
+                driver_process.wait(timeout=5)
             except Exception:
                 pass
     driver_process = None
+
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", 4444), timeout=0.5):
+                time.sleep(0.25)
+        except OSError:
+            return
+    raise RuntimeError("tauri-driver port remained open after shutdown")
+
+
+def restart_driver() -> None:
+    log("restarting tauri-driver to guarantee a clean WebDriver session boundary")
+    stop_driver()
+    start_driver()
 
 
 def create_session() -> None:
@@ -174,22 +192,31 @@ def create_session() -> None:
             }
         }
     }
-    deadline = time.time() + 45
     last_error: Exception | None = None
-    while time.time() < deadline:
+    for attempt in range(1, 4):
         try:
+            log(f"opening Tauri WebDriver session (attempt {attempt}/3)")
             response = http_json("POST", f"{DRIVER_URL}/session", payload, timeout=20)
             value = response.get("value", response) if isinstance(response, dict) else {}
             session_id = value.get("sessionId") or (response.get("sessionId") if isinstance(response, dict) else None)
-            if session_id:
-                http_json("POST", f"{DRIVER_URL}/session/{session_id}/timeouts", {"script": 60000})
-                log(f"Tauri WebDriver session opened: {session_id}")
-                wait_tauri_ready()
-                return
+            if not session_id:
+                raise RuntimeError(f"WebDriver did not return a session id: {response!r}")
+            http_json("POST", f"{DRIVER_URL}/session/{session_id}/timeouts", {"script": 60000})
+            log(f"Tauri WebDriver session opened: {session_id}")
+            wait_tauri_ready()
+            return
         except Exception as error:
             last_error = error
-            time.sleep(1)
-    raise RuntimeError(f"could not open Tauri WebDriver session: {last_error}")
+            log(f"session attempt {attempt}/3 failed: {error}")
+            # A failed POST /session may still launch Tauri while losing the
+            # response (for example hyper::Error(IncompleteMessage)). Retrying
+            # against that driver leaks its single slot and produces
+            # "Maximum number of active sessions". Reset the whole process
+            # group before every retry, even when no session id was returned.
+            stop_driver()
+            if attempt < 3:
+                start_driver()
+    raise RuntimeError(f"could not open Tauri WebDriver session after 3 clean attempts: {last_error}")
 
 
 def close_session() -> None:
@@ -339,6 +366,10 @@ def reconnect_and_finish(inspection_id: str) -> None:
     # Close the real application and open it again before reconnecting. SQLite,
     # evidence files and the device credential must survive the process restart.
     close_session()
+    # WebKitWebDriver can acknowledge DELETE /session before releasing its
+    # single active-session slot. A driver restart makes the process restart
+    # deterministic and also proves the application can reopen from SQLite.
+    restart_driver()
     start_server()
     create_session()
 
