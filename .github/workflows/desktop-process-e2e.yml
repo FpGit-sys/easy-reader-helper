@@ -1,0 +1,185 @@
+name: SiloNR Desktop Process E2E
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "desktop/**"
+      - "src-tauri/**"
+      - "src/routes/api/offline/**"
+      - "src/server/offline/**"
+      - "src/server/files/**"
+      - "src/server/db/**"
+      - "scripts/ci-http-seed.ts"
+      - "scripts/ci-desktop-conflict.ts"
+      - "scripts/ci-desktop-e2e-assert.ts"
+      - "scripts/desktop-webdriver-e2e.py"
+      - "docker-compose.dev.yml"
+      - ".github/workflows/desktop-process-e2e.yml"
+  push:
+    branches:
+      - "production/**"
+    paths:
+      - "desktop/**"
+      - "src-tauri/**"
+      - "src/routes/api/offline/**"
+      - "src/server/offline/**"
+      - "src/server/files/**"
+      - "src/server/db/**"
+      - "scripts/ci-http-seed.ts"
+      - "scripts/ci-desktop-conflict.ts"
+      - "scripts/ci-desktop-e2e-assert.ts"
+      - "scripts/desktop-webdriver-e2e.py"
+      - "docker-compose.dev.yml"
+      - ".github/workflows/desktop-process-e2e.yml"
+
+concurrency:
+  group: silonr-desktop-process-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_ENV: test
+  APP_URL: http://127.0.0.1:3000
+  DATABASE_URL: postgresql://silonr:silonr@127.0.0.1:5432/silonr_desktop_e2e
+  DATABASE_SSL_MODE: disable
+  BETTER_AUTH_URL: http://127.0.0.1:3000
+  BETTER_AUTH_SECRET: desktop-process-e2e-secret-at-least-32-characters
+  ALLOW_PUBLIC_SIGNUP: "false"
+  VITE_ENABLE_DEMO: "false"
+  S3_ENDPOINT: http://127.0.0.1:9000
+  S3_REGION: us-east-1
+  S3_BUCKET: silonr-private
+  S3_ACCESS_KEY_ID: silonr-local
+  S3_SECRET_ACCESS_KEY: silonr-local-secret-change-me
+  S3_FORCE_PATH_STYLE: "true"
+  DISPLAY: :99
+  WEBKIT_DISABLE_COMPOSITING_MODE: "1"
+  LIBGL_ALWAYS_SOFTWARE: "1"
+
+jobs:
+  tauri-sqlite-real-process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: silonr
+          POSTGRES_PASSWORD: silonr
+          POSTGRES_DB: silonr_desktop_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U silonr -d silonr_desktop_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Tauri and WebDriver system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            webkit2gtk-driver \
+            xvfb
+          which WebKitWebDriver
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install JavaScript dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+
+      - name: Start private MinIO storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.dev.yml up -d minio create-bucket
+          for _ in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:9000/minio/health/live >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker compose -f docker-compose.dev.yml logs minio create-bucket
+          exit 1
+
+      - name: Create application and auth schema
+        run: |
+          bunx drizzle-kit push --force
+          bun run auth:migrate
+
+      - name: Seed tenant, pairing code and published checklist
+        run: bun run scripts/ci-http-seed.ts
+
+      - name: Generate desktop resource icons
+        run: bun run tauri icon src-tauri/icons/app-icon.svg
+
+      - name: Build real debug Tauri process with CI-only Linux credential shim
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --manifest-path src-tauri/Cargo.toml --features ci-insecure-store
+          test -x src-tauri/target/debug/silonr-desktop
+
+      - name: Start virtual display
+        shell: bash
+        run: |
+          set -euo pipefail
+          Xvfb :99 -screen 0 1366x900x24 >/tmp/silonr-xvfb.log 2>&1 &
+          echo $! >/tmp/silonr-xvfb.pid
+          sleep 2
+
+      - name: Exercise Tauri process, SQLite, outage, restart, evidence and conflict
+        shell: bash
+        env:
+          SILONR_DESKTOP_BINARY: ${{ github.workspace }}/src-tauri/target/debug/silonr-desktop
+        run: python3 scripts/desktop-webdriver-e2e.py
+
+      - name: Show desktop E2E diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo '--- server ---'
+          tail -n 300 /tmp/silonr-desktop-e2e-server.log 2>/dev/null || true
+          echo '--- tauri-driver ---'
+          tail -n 300 /tmp/silonr-tauri-driver.log 2>/dev/null || true
+          echo '--- xvfb ---'
+          tail -n 100 /tmp/silonr-xvfb.log 2>/dev/null || true
+          echo '--- processes ---'
+          ps aux | grep -E 'silonr|tauri-driver|WebKitWebDriver|Xvfb' || true
+
+      - name: Stop test infrastructure
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/silonr-xvfb.pid ]; then kill "$(cat /tmp/silonr-xvfb.pid)" 2>/dev/null || true; fi
+          docker compose -f docker-compose.dev.yml down -v --remove-orphans || true
