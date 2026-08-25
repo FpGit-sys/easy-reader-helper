@@ -1,0 +1,43 @@
+name: SiloNR Lockfile Refresh
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "production/**"
+    paths:
+      - "package.json"
+      - ".github/workflows/lockfile-refresh.yml"
+
+concurrency:
+  group: silonr-lock-refresh-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Resolve dependencies
+        run: bun install
+
+      - name: Verify lockfile against package manifest
+        run: bun install --frozen-lockfile
+
+      - name: Upload reviewed lockfile candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: SiloNR-bun-lock
+          path: bun.lock
+          if-no-files-found: error
