@@ -1,0 +1,68 @@
+name: SiloNR Migration Artifact
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/server/db/schema.ts"
+      - "src/server/db/schema.extensions.ts"
+      - "drizzle.config.ts"
+      - "drizzle/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/migration-artifact.yml"
+  push:
+    branches:
+      - "production/**"
+    paths:
+      - "src/server/db/schema.ts"
+      - "src/server/db/schema.extensions.ts"
+      - "drizzle.config.ts"
+      - "drizzle/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/migration-artifact.yml"
+
+concurrency:
+  group: silonr-migration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: postgresql://silonr:silonr@127.0.0.1:5432/silonr
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Generate Drizzle migration
+        run: bun run db:generate
+
+      - name: Show generated files
+        shell: bash
+        run: |
+          set -euo pipefail
+          find drizzle -maxdepth 3 -type f -print | sort
+          test -n "$(find drizzle -maxdepth 1 -type f -name '*.sql' -print -quit)"
+
+      - name: Upload migration artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SiloNR-Drizzle-Migration
+          path: drizzle/**
+          if-no-files-found: error
