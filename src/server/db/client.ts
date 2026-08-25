@@ -9,6 +9,12 @@ const schema = { ...baseSchema, ...extensionSchema };
 let pool: Pool | undefined;
 let database: ReturnType<typeof drizzle<typeof schema>> | undefined;
 
+function resolveSsl() {
+  const env = getServerEnv();
+  const mode = env.DATABASE_SSL_MODE ?? (env.NODE_ENV === "production" ? "verify-full" : "disable");
+  return mode === "verify-full" ? { rejectUnauthorized: true } : undefined;
+}
+
 export function getPool() {
   if (!pool) {
     const env = getServerEnv();
@@ -17,7 +23,7 @@ export function getPool() {
       max: env.NODE_ENV === "production" ? 20 : 5,
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,
-      ssl: env.NODE_ENV === "production" ? { rejectUnauthorized: true } : undefined,
+      ssl: resolveSsl(),
     });
   }
   return pool;
