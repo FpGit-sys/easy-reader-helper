@@ -91,7 +91,11 @@ O CI executa também um smoke HTTP do servidor real para confirmar cabeçalhos d
 
 O instalador Windows deve ser assinado antes da distribuição comercial ampla. Builds de teste podem ser não assinados, mas não devem ser apresentados como versão final ao cliente.
 
-Dados offline sensíveis devem ficar no diretório de dados da aplicação, nunca em pasta pública. A versão desktop deve adotar criptografia/proteção de credenciais usando recursos do sistema operacional e banco local com política de backup e sincronização definida.
+O bearer token de dispositivo usado pelo modo offline é protegido no Windows com DPAPI (`CryptProtectData`/`CryptUnprotectData`) antes de ser persistido. O banco SQLite guarda somente a representação protegida, e o pipeline Windows possui teste real de round-trip DPAPI e migração da forma legada que armazenava o token diretamente.
+
+Checklist, respostas e evidências offline ficam no diretório de dados privado da aplicação no perfil do usuário do sistema operacional. O SQLite e os arquivos de evidência **não devem ser descritos como banco criptografado**: a proteção do token não equivale a criptografia integral dos dados locais. Em instalações que exijam proteção de dados em repouso, a implantação deve exigir controles do endpoint, como conta Windows individual, ACLs adequadas e criptografia de volume/dispositivo administrada pela organização.
+
+O workflow de processo Desktop usa Tauri real + WebView + SQLite em Linux para validar perda de conexão, persistência, reinício, reconexão, upload de evidência e conflito. Como DPAPI é específico de Windows, esse build de CI habilita uma feature deliberadamente chamada `ci-insecure-store`, disponível somente em build debug não-Windows. A própria compilação contém `compile_error!` se essa feature for tentada em release. Esse shim não representa proteção de segredo e nunca deve ser distribuído; a segurança da credencial Windows continua sendo validada pelo gate DPAPI separado.
 
 ## Vulnerabilidades
 
