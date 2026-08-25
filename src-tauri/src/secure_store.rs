@@ -88,7 +88,37 @@ mod platform {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(all(not(windows), feature = "ci-insecure-store", debug_assertions))]
+mod platform {
+    use super::BASE64;
+    use base64::Engine as _;
+
+    const PREFIX: &str = "CI_ONLY_NOT_FOR_RELEASE:";
+
+    pub fn protect(value: &str) -> Result<String, String> {
+        if value.is_empty() {
+            return Err("SECURE_STORE_EMPTY_SECRET".to_string());
+        }
+        Ok(BASE64.encode(format!("{PREFIX}{value}").as_bytes()))
+    }
+
+    pub fn unprotect(value: &str) -> Result<String, String> {
+        let decoded = BASE64
+            .decode(value)
+            .map_err(|_| "SECURE_STORE_INVALID_CIPHERTEXT".to_string())?;
+        let decoded = String::from_utf8(decoded)
+            .map_err(|_| "SECURE_STORE_INVALID_PLAINTEXT".to_string())?;
+        decoded
+            .strip_prefix(PREFIX)
+            .map(str::to_owned)
+            .ok_or_else(|| "SECURE_STORE_CI_PREFIX_MISSING".to_string())
+    }
+}
+
+#[cfg(all(not(windows), feature = "ci-insecure-store", not(debug_assertions)))]
+compile_error!("The ci-insecure-store feature is forbidden in release builds.");
+
+#[cfg(all(not(windows), not(feature = "ci-insecure-store")))]
 mod platform {
     pub fn protect(_value: &str) -> Result<String, String> {
         Err("SECURE_STORE_WINDOWS_REQUIRED".to_string())
