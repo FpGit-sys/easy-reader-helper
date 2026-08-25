@@ -8,6 +8,7 @@ on:
     paths:
       - "desktop/**"
       - "src-tauri/**"
+      - "scripts/windows-installer-smoke.ps1"
       - "package.json"
       - "bun.lock"
       - ".github/workflows/desktop-windows.yml"
@@ -17,6 +18,7 @@ on:
     paths:
       - "desktop/**"
       - "src-tauri/**"
+      - "scripts/windows-installer-smoke.ps1"
       - "package.json"
       - "bun.lock"
       - ".github/workflows/desktop-windows.yml"
@@ -31,7 +33,7 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -57,6 +59,10 @@ jobs:
 
       - name: Build Windows installers
         run: bun run desktop:build
+
+      - name: Smoke install MSI and NSIS
+        shell: pwsh
+        run: ./scripts/windows-installer-smoke.ps1
 
       - name: Upload NSIS installer
         uses: actions/upload-artifact@v4
