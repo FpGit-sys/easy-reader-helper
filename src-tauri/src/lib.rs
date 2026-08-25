@@ -1,5 +1,6 @@
-mod offline;
+mod offline_v2;
 
+use offline_v2 as offline;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 use tauri::{AppHandle, Manager, WebviewWindow};
@@ -116,6 +117,8 @@ pub fn run() {
             offline::list_offline_silos,
             offline::start_offline_inspection,
             offline::save_offline_answer,
+            offline::add_offline_evidence,
+            offline::remove_offline_evidence,
             offline::request_offline_finalize,
             offline::list_offline_inspections,
             offline::get_offline_inspection,
