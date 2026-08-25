@@ -71,9 +71,9 @@ jobs:
           --health-retries 10
     env:
       NODE_ENV: test
-      APP_URL: http://localhost:3000
+      APP_URL: http://127.0.0.1:3000
       DATABASE_URL: postgresql://silonr:silonr@127.0.0.1:5432/silonr_test
-      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_URL: http://127.0.0.1:3000
       BETTER_AUTH_SECRET: integration-only-secret-at-least-32-characters
       ALLOW_PUBLIC_SIGNUP: "false"
       VITE_ENABLE_DEMO: "false"
@@ -99,7 +99,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bun run dev > /tmp/silonr-vite.log 2>&1 &
+          bun run dev -- --host 127.0.0.1 > /tmp/silonr-vite.log 2>&1 &
           APP_PID=$!
           trap 'kill "$APP_PID" >/dev/null 2>&1 || true' EXIT
 
