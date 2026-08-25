@@ -43,8 +43,8 @@ O backup externo é obrigatório e deve usar outro bucket/conta ou outro provedo
 ## 4. Subida e validação
 
 ```bash
-sudo ./ops/pilot-deploy.sh
-sudo ./ops/install-pilot-systemd.sh
+sudo bash ./ops/pilot-deploy.sh
+sudo bash ./ops/install-pilot-systemd.sh
 sudo systemctl start silonr-backup.service
 sudo systemctl start silonr-restore-drill.service
 ```
