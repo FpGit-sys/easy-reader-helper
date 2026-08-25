@@ -380,9 +380,10 @@ fn current_server_url(app: &AppHandle) -> Result<String, String> {
 
 async fn refresh_pack_internal(app: &AppHandle) -> Result<OfflinePack, String> {
     let server_url = current_server_url(app)?;
-    let conn = open_db(app)?;
-    let token = get_meta(&conn, "device_token")?.ok_or_else(|| "DEVICE_NOT_PAIRED".to_string())?;
-    drop(conn);
+    let token = {
+        let conn = open_db(app)?;
+        get_meta(&conn, "device_token")?.ok_or_else(|| "DEVICE_NOT_PAIRED".to_string())?
+    };
 
     let response = http_client()?
         .get(format!("{server_url}/api/offline/bootstrap"))
@@ -445,9 +446,10 @@ pub async fn pair_device(
     ensure_offline_window(&window)?;
     let parsed = super::validate_server_url(&server_url)?;
     let normalized_server = parsed.as_str().trim_end_matches('/').to_string();
-    let conn = open_db(&app)?;
-    let fingerprint = install_id(&conn)?;
-    drop(conn);
+    let fingerprint = {
+        let conn = open_db(&app)?;
+        install_id(&conn)?
+    };
 
     let response = http_client()?
         .post(format!("{normalized_server}/api/offline/activate"))
@@ -478,21 +480,22 @@ pub async fn pair_device(
             server_url: normalized_server,
         },
     )?;
-    let conn = open_db(&app)?;
-    let old_org = get_meta(&conn, "organization_id")?;
-    let old_facility = get_meta(&conn, "facility_id")?;
-    if old_org.as_deref().is_some_and(|value| value != activation.organization_id)
-        || old_facility.as_deref().is_some_and(|value| value != activation.facility_id)
     {
-        clear_local_workspace(&app, &conn)?;
+        let conn = open_db(&app)?;
+        let old_org = get_meta(&conn, "organization_id")?;
+        let old_facility = get_meta(&conn, "facility_id")?;
+        if old_org.as_deref().is_some_and(|value| value != activation.organization_id)
+            || old_facility.as_deref().is_some_and(|value| value != activation.facility_id)
+        {
+            clear_local_workspace(&app, &conn)?;
+        }
+        set_meta(&conn, "device_token", &activation.token)?;
+        set_meta(&conn, "device_id", &activation.device_id)?;
+        set_meta(&conn, "organization_id", &activation.organization_id)?;
+        set_meta(&conn, "facility_id", &activation.facility_id)?;
+        set_meta(&conn, "user_id", &activation.user_id)?;
+        set_meta(&conn, "offline_allowed_until", &activation.offline_allowed_until)?;
     }
-    set_meta(&conn, "device_token", &activation.token)?;
-    set_meta(&conn, "device_id", &activation.device_id)?;
-    set_meta(&conn, "organization_id", &activation.organization_id)?;
-    set_meta(&conn, "facility_id", &activation.facility_id)?;
-    set_meta(&conn, "user_id", &activation.user_id)?;
-    set_meta(&conn, "offline_allowed_until", &activation.offline_allowed_until)?;
-    drop(conn);
 
     refresh_pack_internal(&app).await?;
     desktop_status_inner(&app)
@@ -797,13 +800,16 @@ pub fn list_offline_inspections(app: AppHandle, window: WebviewWindow) -> Result
     ensure_offline_window(&window)?;
     let conn = open_db(&app)?;
     let pack = read_pack(&conn)?.ok_or_else(|| "OFFLINE_PACK_MISSING".to_string())?;
-    let mut statement = conn.prepare(
-        "SELECT id FROM local_inspections ORDER BY datetime(updated_at) DESC, id DESC",
-    ).map_err(|error| format!("Falha ao listar inspeções locais: {error}"))?;
-    let ids = statement.query_map([], |row| row.get::<_, String>(0))
-        .map_err(|error| format!("Falha ao listar inspeções locais: {error}"))?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| format!("Falha ao ler inspeções locais: {error}"))?;
+    let ids = {
+        let mut statement = conn.prepare(
+            "SELECT id FROM local_inspections ORDER BY datetime(updated_at) DESC, id DESC",
+        ).map_err(|error| format!("Falha ao listar inspeções locais: {error}"))?;
+        let values = statement.query_map([], |row| row.get::<_, String>(0))
+            .map_err(|error| format!("Falha ao listar inspeções locais: {error}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| format!("Falha ao ler inspeções locais: {error}"))?;
+        values
+    };
     ids.into_iter().map(|id| load_inspection_detail(&conn, &id, &pack).map(summary_from_detail)).collect()
 }
 
@@ -835,20 +841,24 @@ pub async fn sync_now(app: AppHandle, window: WebviewWindow) -> Result<DesktopSt
     desktop_status_inner(&app)
 }
 
-async fn sync_json_outbox(app: &AppHandle, server_url: &str, token: &str, table: &str) -> Result<(), String> {
+fn read_outbox_events(app: &AppHandle, table: &str) -> Result<Vec<Value>, String> {
     if table != "outbox" && table != "finalize_outbox" {
         return Err("OFFLINE_OUTBOX_INVALID".to_string());
     }
     let conn = open_db(app)?;
     let sql = format!("SELECT payload FROM {table} ORDER BY datetime(created_at), event_id");
-    let mut statement = conn.prepare(&sql).map_err(|error| format!("Falha ao ler fila de sincronização: {error}"))?;
-    let events = statement.query_map([], |row| row.get::<_, String>(0))
+    let mut statement = conn.prepare(&sql)
+        .map_err(|error| format!("Falha ao ler fila de sincronização: {error}"))?;
+    let values = statement.query_map([], |row| row.get::<_, String>(0))
         .map_err(|error| format!("Falha ao ler fila de sincronização: {error}"))?
         .map(|row| row.map_err(|error| format!("Falha ao ler evento local: {error}"))
             .and_then(|raw| serde_json::from_str::<Value>(&raw).map_err(|error| format!("Evento local inválido: {error}"))))
         .collect::<Result<Vec<_>, _>>()?;
-    drop(statement);
-    drop(conn);
+    Ok(values)
+}
+
+async fn sync_json_outbox(app: &AppHandle, server_url: &str, token: &str, table: &str) -> Result<(), String> {
+    let events = read_outbox_events(app, table)?;
     if events.is_empty() {
         return Ok(());
     }
@@ -910,26 +920,28 @@ async fn sync_json_outbox(app: &AppHandle, server_url: &str, token: &str, table:
     Ok(())
 }
 
+fn pending_evidence_rows(app: &AppHandle) -> Result<Vec<EvidenceRow>, String> {
+    let conn = open_db(app)?;
+    let mut statement = conn.prepare(
+        "SELECT e.id, e.inspection_id, e.requirement_id, e.file_name, e.mime_type, e.size_bytes,
+                e.sha256, e.local_path, e.description, e.status, e.last_error, e.captured_at
+         FROM local_evidence e
+         JOIN local_inspections i ON i.id = e.inspection_id
+         WHERE e.status = 'pending'
+           AND i.base_server_revision > 0
+           AND i.sync_state NOT IN ('conflict', 'rejected')
+           AND NOT EXISTS (SELECT 1 FROM outbox o WHERE o.inspection_id = i.id)
+         ORDER BY datetime(e.captured_at), e.id",
+    ).map_err(|error| format!("Falha ao ler evidências pendentes: {error}"))?;
+    let values = statement.query_map([], evidence_from_row)
+        .map_err(|error| format!("Falha ao ler evidências pendentes: {error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("Falha ao carregar evidências pendentes: {error}"))?;
+    Ok(values)
+}
+
 async fn sync_pending_evidence(app: &AppHandle, server_url: &str, token: &str) -> Result<(), String> {
-    let rows = {
-        let conn = open_db(app)?;
-        let mut statement = conn.prepare(
-            "SELECT e.id, e.inspection_id, e.requirement_id, e.file_name, e.mime_type, e.size_bytes,
-                    e.sha256, e.local_path, e.description, e.status, e.last_error, e.captured_at
-             FROM local_evidence e
-             JOIN local_inspections i ON i.id = e.inspection_id
-             WHERE e.status = 'pending'
-               AND i.base_server_revision > 0
-               AND i.sync_state NOT IN ('conflict', 'rejected')
-               AND NOT EXISTS (SELECT 1 FROM outbox o WHERE o.inspection_id = i.id)
-             ORDER BY datetime(e.captured_at), e.id",
-        ).map_err(|error| format!("Falha ao ler evidências pendentes: {error}"))?;
-        let values = statement.query_map([], evidence_from_row)
-            .map_err(|error| format!("Falha ao ler evidências pendentes: {error}"))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|error| format!("Falha ao carregar evidências pendentes: {error}"))?;
-        values
-    };
+    let rows = pending_evidence_rows(app)?;
 
     for row in rows {
         let bytes = fs::read(&row.local_path).map_err(|error| format!("EVIDENCE_LOCAL_FILE_MISSING:{error}"))?;
@@ -1002,10 +1014,11 @@ fn prepare_finalize_events(app: &AppHandle) -> Result<(), String> {
                AND NOT EXISTS (SELECT 1 FROM local_evidence e WHERE e.inspection_id = i.id AND e.status != 'uploaded')
              ORDER BY datetime(i.updated_at), i.id",
         ).map_err(|error| format!("Falha ao preparar conclusões: {error}"))?;
-        statement.query_map([], |row| row.get::<_, String>(0))
+        let values = statement.query_map([], |row| row.get::<_, String>(0))
             .map_err(|error| format!("Falha ao preparar conclusões: {error}"))?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|error| format!("Falha ao ler conclusões: {error}"))?
+            .map_err(|error| format!("Falha ao ler conclusões: {error}"))?;
+        values
     };
     let tx = conn.transaction().map_err(|error| format!("Falha ao preparar conclusões: {error}"))?;
     for id in ids {
@@ -1108,11 +1121,12 @@ fn load_answers(conn: &Connection, inspection_id: &str) -> Result<Vec<LocalAnswe
     let mut statement = conn.prepare(
         "SELECT requirement_id, result, notes, answered_at FROM local_answers WHERE inspection_id = ?1 ORDER BY requirement_id",
     ).map_err(|error| format!("Falha ao carregar respostas locais: {error}"))?;
-    statement.query_map(params![inspection_id], |row| Ok(LocalAnswer {
+    let values = statement.query_map(params![inspection_id], |row| Ok(LocalAnswer {
         requirement_id: row.get(0)?, result: row.get(1)?, notes: row.get(2)?, answered_at: row.get(3)?,
     })).map_err(|error| format!("Falha ao carregar respostas locais: {error}"))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| format!("Falha ao ler respostas locais: {error}"))
+        .map_err(|error| format!("Falha ao ler respostas locais: {error}"))?;
+    Ok(values)
 }
 
 fn evidence_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<EvidenceRow> {
@@ -1129,10 +1143,11 @@ fn load_evidence_rows(conn: &Connection, inspection_id: &str) -> Result<Vec<Evid
                 local_path, description, status, last_error, captured_at
          FROM local_evidence WHERE inspection_id = ?1 ORDER BY datetime(captured_at), id",
     ).map_err(|error| format!("Falha ao carregar evidências locais: {error}"))?;
-    statement.query_map(params![inspection_id], evidence_from_row)
+    let values = statement.query_map(params![inspection_id], evidence_from_row)
         .map_err(|error| format!("Falha ao carregar evidências locais: {error}"))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| format!("Falha ao ler evidências locais: {error}"))
+        .map_err(|error| format!("Falha ao ler evidências locais: {error}"))?;
+    Ok(values)
 }
 
 fn load_evidence_row(conn: &Connection, evidence_id: &str) -> Result<Option<EvidenceRow>, String> {
