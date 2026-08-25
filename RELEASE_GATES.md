@@ -23,7 +23,7 @@ Evidência: workflow `SiloNR CI`.
 - [x] RBAC server-side;
 - [x] silos persistidos;
 - [x] requisitos versionados e fontes rastreáveis;
-- [x] documents privados e versionados;
+- [x] documentos privados e versionados;
 - [x] inspeções com snapshot imutável;
 - [x] evidências privadas;
 - [x] não conformidades e ações corretivas;
@@ -42,11 +42,11 @@ Evidência: workflow `SiloNR CI`.
 - [x] aplicativo instalado por NSIS inicia e permanece ativo no smoke test;
 - [x] NSIS desinstala no smoke test;
 - [x] artefatos são publicados apenas quando o smoke de instalação passa;
-- [ ] token de dispositivo efetivamente armazenado com proteção Windows DPAPI/credencial equivalente, sem plaintext reutilizável no SQLite;
+- [x] token de dispositivo armazenado com Windows DPAPI, com migração de token legado e sem leitura/gravação direta reutilizável em plaintext no SQLite;
 - [x] troca/reinstalação de instalador preserva diretório de dados, banco SQLite e sentinel que representa rascunhos/evidências offline pendentes;
 - [ ] assinatura Authenticode do instalador/binário para distribuição comercial (ou decisão formal de piloto controlado sem assinatura).
 
-Evidência atual: workflow `SiloNR Windows Desktop` e `scripts/windows-installer-smoke.ps1`. O smoke executa instalação, abertura, desinstalação e transição MSI → NSIS sem apagar o diretório de dados do usuário.
+Evidência atual: workflows `SiloNR Windows Desktop` e `SiloNR DPAPI Security`, além de `scripts/windows-installer-smoke.ps1`. O gate DPAPI executa roundtrip real com `CryptProtectData`/`CryptUnprotectData` em runner Windows e compila a biblioteca Tauri.
 
 ## Gate D — Offline e sincronização
 
