@@ -196,7 +196,11 @@ def create_session() -> None:
     for attempt in range(1, 4):
         try:
             log(f"opening Tauri WebDriver session (attempt {attempt}/3)")
-            response = http_json("POST", f"{DRIVER_URL}/session", payload, timeout=20)
+            # A cold WebKit/Tauri start on a fresh GitHub runner regularly
+            # exceeds 20 seconds while the webview and renderer initialize.
+            # Closing the HTTP request early makes tauri-driver report
+            # hyper::Error(IncompleteMessage even though the app did launch.
+            response = http_json("POST", f"{DRIVER_URL}/session", payload, timeout=90)
             value = response.get("value", response) if isinstance(response, dict) else {}
             session_id = value.get("sessionId") or (response.get("sessionId") if isinstance(response, dict) else None)
             if not session_id:
