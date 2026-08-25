@@ -10,6 +10,7 @@ on:
       - ".dockerignore"
       - "docker-compose.pilot.yml"
       - "deploy/pilot/**"
+      - "scripts/pilot-preflight.sh"
       - "src/server/env.ts"
       - "src/server/files/storage.ts"
       - "package.json"
@@ -23,6 +24,7 @@ on:
       - ".dockerignore"
       - "docker-compose.pilot.yml"
       - "deploy/pilot/**"
+      - "scripts/pilot-preflight.sh"
       - "src/server/env.ts"
       - "src/server/files/storage.ts"
       - "package.json"
@@ -42,11 +44,14 @@ env:
   ACME_EMAIL: ci@silonr.invalid
   POSTGRES_DB: silonr
   POSTGRES_USER: silonr
-  POSTGRES_PASSWORD: ci-postgres-password-not-for-production
+  POSTGRES_PASSWORD: ci-postgres-secret-2026-not-production
   BETTER_AUTH_SECRET: ci-pilot-stack-secret-at-least-32-characters
-  MINIO_ROOT_USER: silonr-ci-storage
-  MINIO_ROOT_PASSWORD: ci-minio-password-not-for-production
+  MINIO_ROOT_USER: silonr-ci-storage-root
+  MINIO_ROOT_PASSWORD: ci-minio-root-secret-2026-not-production
+  S3_ACCESS_KEY_ID: silonr-ci-app
+  S3_SECRET_ACCESS_KEY: ci-minio-app-secret-2026-not-production
   S3_BUCKET: silonr-private
+  SILONR_PREFLIGHT_ALLOW_TEST_VALUES: "true"
 
 jobs:
   container-smoke:
@@ -81,7 +86,15 @@ jobs:
                 - public-edge
           YAML
 
-      - name: Validate Compose model
+      - name: Validate real pilot deployment preflight
+        shell: bash
+        env:
+          # Preflight must inspect the real, unexposed compose model. The CI override
+          # intentionally publishes loopback ports for the smoke steps below.
+          SILONR_COMPOSE_OVERRIDE: ""
+        run: bash scripts/pilot-preflight.sh
+
+      - name: Validate Compose model with CI loopback override
         run: docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml config --quiet
 
       - name: Build migration and runtime images
@@ -89,6 +102,17 @@ jobs:
 
       - name: Start database, private storage, migrations and app
         run: docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml up -d --wait postgres minio create-bucket migrate app
+
+      - name: Verify application uses bucket-scoped S3 identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_access_key="$(docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml exec -T app printenv S3_ACCESS_KEY_ID)"
+          test "$app_access_key" = "$S3_ACCESS_KEY_ID"
+          test "$app_access_key" != "$MINIO_ROOT_USER"
+          docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml run --rm --no-deps \
+            --entrypoint /bin/sh create-bucket -c \
+            'mc alias set verify http://minio:9000 "$S3_ACCESS_KEY_ID" "$S3_SECRET_ACCESS_KEY" >/dev/null && mc stat "verify/$S3_BUCKET" >/dev/null'
 
       - name: Verify production runtime health
         shell: bash
