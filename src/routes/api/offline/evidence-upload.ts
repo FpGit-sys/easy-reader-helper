@@ -31,7 +31,7 @@ const metadataSchema = z.object({
   inspectionId: z.string().uuid(),
   requirementId: z.string().uuid(),
   description: z.string().trim().max(5000).default(""),
-  capturedAt: z.string().datetime().optional(),
+  capturedAt: z.string().datetime({ offset: true }).optional(),
   expectedSha256: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
 });
 
