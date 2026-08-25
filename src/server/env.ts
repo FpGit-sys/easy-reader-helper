@@ -11,6 +11,7 @@ const serverEnvSchema = z.object({
     .default("false")
     .transform((value) => value === "true"),
   S3_ENDPOINT: z.string().url().optional().or(z.literal("")),
+  S3_PUBLIC_ENDPOINT: z.string().url().optional().or(z.literal("")),
   S3_REGION: z.string().default("auto"),
   S3_BUCKET: z.string().min(1).default("silonr-private"),
   S3_ACCESS_KEY_ID: z.string().optional().default(""),
