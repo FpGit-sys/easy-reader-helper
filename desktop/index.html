@@ -25,16 +25,17 @@
           <span class="eyebrow">Operação local e sincronização controlada</span>
           <h1>Inspeções continuam mesmo quando a internet não continua.</h1>
           <p>
-            O modo offline mantém checklist e respostas em um banco SQLite deste computador e envia
-            as alterações ao servidor quando a conexão voltar. O servidor continua sendo a fonte
-            oficial da operação.
+            Checklist, respostas e evidências fotográficas ficam preservados localmente neste
+            computador. Quando a conexão voltar, o SiloNR sincroniza em etapas e o servidor volta a
+            validar permissões, versão do checklist, licença e conflitos antes de aceitar o trabalho.
           </p>
         </div>
         <div class="hero-note">
-          <strong>Importante</strong>
+          <strong>Offline de verdade</strong>
           <p>
-            Critérios que exigem evidência podem ser respondidos offline, mas a conclusão permanece
-            bloqueada até que a evidência seja anexada no fluxo online.
+            Evidências obrigatórias podem ser anexadas sem internet. O arquivo é validado, recebe
+            SHA-256, entra na fila e precisa ser confirmado pelo storage privado antes da conclusão
+            da inspeção ser efetivada no servidor.
           </p>
         </div>
       </section>
@@ -71,30 +72,19 @@
 
       <section id="workspace-section" hidden>
         <div class="metrics">
-          <article class="metric">
-            <span>Empresa / unidade</span>
-            <strong id="workspace-name">—</strong>
-          </article>
-          <article class="metric">
-            <span>Pacote offline</span>
-            <strong id="pack-date">—</strong>
-          </article>
-          <article class="metric">
-            <span>Operação offline válida até</span>
-            <strong id="offline-until">—</strong>
-          </article>
-          <article class="metric">
-            <span>Fila de sincronização</span>
-            <strong id="pending-count">0</strong>
-          </article>
+          <article class="metric"><span>Empresa / unidade</span><strong id="workspace-name">—</strong></article>
+          <article class="metric"><span>Pacote offline</span><strong id="pack-date">—</strong></article>
+          <article class="metric"><span>Operação offline válida até</span><strong id="offline-until">—</strong></article>
+          <article class="metric"><span>Fila de sincronização</span><strong id="pending-count">0</strong></article>
         </div>
 
         <section class="panel sync-panel">
           <div>
             <h2>Sincronização</h2>
             <p>
-              O SiloNR envia somente eventos pendentes. Eventos já aceitos possuem identificador
-              idempotente e não são aplicados duas vezes no servidor.
+              Primeiro o rascunho da inspeção é confirmado, depois as evidências privadas são
+              enviadas e, por último, a conclusão é validada. Eventos aceitos são idempotentes e não
+              devem ser aplicados duas vezes.
             </p>
           </div>
           <div class="button-group">
@@ -106,40 +96,21 @@
         <section class="work-grid">
           <div class="panel">
             <div class="section-heading inline">
-              <div>
-                <span class="step">2</span>
-                <h2>Nova inspeção offline</h2>
-                <p>O checklist é congelado a partir do último pacote baixado.</p>
-              </div>
+              <div><span class="step">2</span><h2>Nova inspeção offline</h2><p>O checklist é congelado a partir do último pacote baixado.</p></div>
             </div>
             <form id="new-inspection-form" class="stack">
-              <label class="field">
-                <span>Silo</span>
-                <select id="silo-select" required></select>
-              </label>
-              <label class="field">
-                <span>Tipo de inspeção</span>
-                <input id="inspection-type" type="text" maxlength="160" value="Inspeção operacional" required />
-              </label>
-              <label class="field">
-                <span>Observações iniciais</span>
-                <textarea id="inspection-notes" rows="3" maxlength="5000"></textarea>
-              </label>
+              <label class="field"><span>Silo</span><select id="silo-select" required></select></label>
+              <label class="field"><span>Tipo de inspeção</span><input id="inspection-type" type="text" maxlength="160" value="Inspeção operacional" required /></label>
+              <label class="field"><span>Observações iniciais</span><textarea id="inspection-notes" rows="3" maxlength="5000"></textarea></label>
               <button id="start-inspection" class="button primary" type="submit">Iniciar inspeção local</button>
             </form>
           </div>
 
           <div class="panel">
             <div class="section-heading inline">
-              <div>
-                <span class="step">3</span>
-                <h2>Inspeções neste computador</h2>
-                <p>Rascunhos, pendências de sync e conflitos ficam visíveis aqui.</p>
-              </div>
+              <div><span class="step">3</span><h2>Inspeções neste computador</h2><p>Rascunhos, evidências, pendências de sync e conflitos ficam visíveis aqui.</p></div>
             </div>
-            <div id="inspection-list" class="inspection-list">
-              <p class="empty">Nenhuma inspeção local.</p>
-            </div>
+            <div id="inspection-list" class="inspection-list"><p class="empty">Nenhuma inspeção local.</p></div>
           </div>
         </section>
 
