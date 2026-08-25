@@ -3,8 +3,6 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 env_file="${SILONR_ENV_FILE:-$repo_root/deploy/pilot/.env}"
-state_dir="${PILOT_MONITOR_STATE_DIR:-/var/lib/silonr-monitor}"
-threshold="${PILOT_MONITOR_FAILURE_THRESHOLD:-3}"
 compose=(docker compose --env-file "$env_file" -f "$repo_root/docker-compose.pilot.yml")
 
 [[ -f "$env_file" ]] || { echo "[pilot-monitor] missing $env_file" >&2; exit 1; }
@@ -12,7 +10,11 @@ set -a
 # shellcheck disable=SC1090
 source "$env_file"
 set +a
+state_dir="${PILOT_MONITOR_STATE_DIR:-/var/lib/silonr-monitor}"
+threshold="${PILOT_MONITOR_FAILURE_THRESHOLD:-3}"
+disk_threshold="${PILOT_MONITOR_DISK_PERCENT:-90}"
 [[ "$threshold" =~ ^[1-9][0-9]*$ ]] || { echo "[pilot-monitor] invalid failure threshold" >&2; exit 1; }
+[[ "$disk_threshold" =~ ^[1-9][0-9]?$|^100$ ]] || { echo "[pilot-monitor] invalid disk threshold" >&2; exit 1; }
 mkdir -p "$state_dir"
 
 problems=()
@@ -25,6 +27,11 @@ check_url() {
 check_url "application liveness" "https://$SILONR_DOMAIN/api/health/live"
 check_url "application readiness" "https://$SILONR_DOMAIN/api/health/ready"
 check_url "private storage" "https://$SILONR_FILES_DOMAIN/minio/health/live"
+
+disk_percent="$(df -P "$PILOT_BACKUP_DIR" 2>/dev/null | awk 'NR==2 {gsub(/%/, "", $5); print $5}')"
+if [[ "$disk_percent" =~ ^[0-9]+$ ]] && ((disk_percent >= disk_threshold)); then
+  problems+=("disk usage is ${disk_percent}% (threshold ${disk_threshold}%)")
+fi
 
 running="$("${compose[@]}" ps --status running --services 2>/dev/null || true)"
 for service in postgres minio app caddy; do
