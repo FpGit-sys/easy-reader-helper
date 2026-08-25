@@ -11,6 +11,7 @@ import {
   evidenceLinks,
   evidences,
 } from "@/server/db/schema";
+import { getServerEnv } from "@/server/env";
 import {
   MAX_DOCUMENT_BYTES,
   safeStorageFilename,
@@ -24,6 +25,7 @@ import {
   makePrivateObjectKey,
   putPrivateObject,
 } from "@/server/files/storage";
+import { assertTrustedMutationOrigin } from "@/server/security/origin";
 
 const metadataSchema = z.object({
   organizationId: z.string().uuid(),
@@ -40,6 +42,7 @@ export const Route = createFileRoute("/api/actions/evidence-upload")({
         let databaseCommitted = false;
 
         try {
+          assertTrustedMutationOrigin(request, getServerEnv().APP_URL);
           const session = await getAuth().api.getSession({ headers: request.headers });
           if (!session?.user?.id) return json({ error: "UNAUTHORIZED" }, 401);
           validateRequestContentLength(request, MAX_DOCUMENT_BYTES);
