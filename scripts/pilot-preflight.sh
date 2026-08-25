@@ -23,6 +23,13 @@ required=(
   S3_ACCESS_KEY_ID
   S3_SECRET_ACCESS_KEY
   S3_BUCKET
+  PILOT_ALERT_WEBHOOK_URL
+  PILOT_BACKUP_DIR
+  PILOT_BACKUP_S3_ENDPOINT
+  PILOT_BACKUP_S3_ACCESS_KEY_ID
+  PILOT_BACKUP_S3_SECRET_ACCESS_KEY
+  PILOT_BACKUP_S3_BUCKET
+  PILOT_BACKUP_PREFIX
 )
 
 for key in "${required[@]}"; do
@@ -49,15 +56,27 @@ validate_host SILONR_FILES_DOMAIN
 [[ ${#MINIO_ROOT_PASSWORD} -ge 20 ]] || fail "MINIO_ROOT_PASSWORD must contain at least 20 characters"
 [[ ${#S3_SECRET_ACCESS_KEY} -ge 20 ]] || fail "S3_SECRET_ACCESS_KEY must contain at least 20 characters"
 [[ ${#S3_ACCESS_KEY_ID} -ge 3 ]] || fail "S3_ACCESS_KEY_ID must contain at least 3 characters"
+[[ ${#PILOT_BACKUP_S3_ACCESS_KEY_ID} -ge 3 ]] || fail "PILOT_BACKUP_S3_ACCESS_KEY_ID must contain at least 3 characters"
+[[ ${#PILOT_BACKUP_S3_SECRET_ACCESS_KEY} -ge 20 ]] || fail "PILOT_BACKUP_S3_SECRET_ACCESS_KEY must contain at least 20 characters"
+[[ "$PILOT_ALERT_WEBHOOK_URL" == https://* ]] || fail "PILOT_ALERT_WEBHOOK_URL must use HTTPS"
+[[ "$PILOT_BACKUP_S3_ENDPOINT" == https://* ]] || fail "PILOT_BACKUP_S3_ENDPOINT must use HTTPS"
+[[ "$PILOT_BACKUP_DIR" == /* ]] || fail "PILOT_BACKUP_DIR must be an absolute path"
+[[ "$PILOT_BACKUP_PREFIX" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "PILOT_BACKUP_PREFIX contains unsafe characters"
+[[ "$PILOT_BACKUP_S3_BUCKET" != "$S3_BUCKET" ]] || fail "external backup bucket must differ from the primary bucket"
 
 [[ "$POSTGRES_PASSWORD" != "$BETTER_AUTH_SECRET" ]] || fail "database and auth secrets must not be reused"
 [[ "$POSTGRES_PASSWORD" != "$MINIO_ROOT_PASSWORD" ]] || fail "database and MinIO root secrets must not be reused"
 [[ "$POSTGRES_PASSWORD" != "$S3_SECRET_ACCESS_KEY" ]] || fail "database and S3 application secrets must not be reused"
 [[ "$MINIO_ROOT_PASSWORD" != "$S3_SECRET_ACCESS_KEY" ]] || fail "MinIO root and S3 application secrets must be different"
 [[ "$MINIO_ROOT_USER" != "$S3_ACCESS_KEY_ID" ]] || fail "MinIO root and application access-key identities must be different"
+[[ "$PILOT_BACKUP_S3_ACCESS_KEY_ID" != "$S3_ACCESS_KEY_ID" ]] || fail "backup and application access-key identities must be different"
+[[ "$PILOT_BACKUP_S3_ACCESS_KEY_ID" != "$MINIO_ROOT_USER" ]] || fail "backup and MinIO root identities must be different"
+[[ "$PILOT_BACKUP_S3_SECRET_ACCESS_KEY" != "$S3_SECRET_ACCESS_KEY" ]] || fail "backup and application storage secrets must be different"
+[[ "$PILOT_BACKUP_S3_SECRET_ACCESS_KEY" != "$MINIO_ROOT_PASSWORD" ]] || fail "backup and MinIO root secrets must be different"
+[[ "$PILOT_BACKUP_S3_ENDPOINT" != "http://minio:9000" ]] || fail "backup endpoint must be external to the primary stack"
 
 if [[ "${SILONR_PREFLIGHT_ALLOW_TEST_VALUES:-false}" != "true" ]]; then
-  combined="$SILONR_DOMAIN $SILONR_FILES_DOMAIN $POSTGRES_PASSWORD $BETTER_AUTH_SECRET $MINIO_ROOT_PASSWORD $S3_SECRET_ACCESS_KEY"
+  combined="$SILONR_DOMAIN $SILONR_FILES_DOMAIN $POSTGRES_PASSWORD $BETTER_AUTH_SECRET $MINIO_ROOT_PASSWORD $S3_SECRET_ACCESS_KEY $PILOT_ALERT_WEBHOOK_URL $PILOT_BACKUP_S3_ENDPOINT $PILOT_BACKUP_S3_ACCESS_KEY_ID $PILOT_BACKUP_S3_SECRET_ACCESS_KEY $PILOT_BACKUP_S3_BUCKET"
   shopt -s nocasematch
   [[ ! "$combined" =~ CHANGE_ME|example\.com|\.invalid|not-for-production|password123 ]] || \
     fail "placeholder/test values are forbidden for a real pilot"
