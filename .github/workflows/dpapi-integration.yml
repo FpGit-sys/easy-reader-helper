@@ -133,13 +133,25 @@ jobs:
           offline.write_text(offline_text, encoding="utf-8")
 
       - name: Verify source invariant
-        shell: bash
+        shell: python
         run: |
-          set -euo pipefail
-          grep -q '^mod secure_store;' src-tauri/src/lib.rs
-          test "$(grep -o '"'"'device_token'"'"' src-tauri/src/offline_v2.rs | wc -l | tr -d ' ')" = "1"
-          grep -q 'store_device_token(&conn, &activation.token)' src-tauri/src/offline_v2.rs
-          test "$(grep -o 'require_device_token(&conn)' src-tauri/src/offline_v2.rs | wc -l | tr -d ' ')" = "2"
+          from pathlib import Path
+
+          lib_text = Path("src-tauri/src/lib.rs").read_text(encoding="utf-8")
+          offline_text = Path("src-tauri/src/offline_v2.rs").read_text(encoding="utf-8")
+
+          checks = {
+              "secure_store module": "mod secure_store;" in lib_text,
+              "single token key literal": offline_text.count('"device_token"') == 1,
+              "secure pairing write": "store_device_token(&conn, &activation.token)?;" in offline_text,
+              "two secure authenticated reads": offline_text.count("require_device_token(&conn)?") == 2,
+              "secure status read": "let paired = load_device_token(&conn)?.is_some();" in offline_text,
+              "DPAPI prefix": 'const DEVICE_TOKEN_PREFIX: &str = "dpapi:v1:";' in offline_text,
+          }
+          failed = [name for name, ok in checks.items() if not ok]
+          if failed:
+              raise SystemExit("DPAPI source invariant failed: " + ", ".join(failed))
+          print("DPAPI source invariant approved")
 
       - name: Commit integration
         shell: bash
