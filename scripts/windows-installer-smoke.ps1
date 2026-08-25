@@ -83,6 +83,34 @@ function Get-SiloExecutable {
   return $null
 }
 
+function Get-SiloDataDirectory {
+  $knownDirectories = @(
+    (Join-Path $env:APPDATA "br.com.silonr.desktop"),
+    (Join-Path $env:LOCALAPPDATA "br.com.silonr.desktop"),
+    (Join-Path $env:APPDATA "SiloNR"),
+    (Join-Path $env:LOCALAPPDATA "SiloNR")
+  )
+
+  foreach ($directory in $knownDirectories) {
+    if ($directory -and (Test-Path (Join-Path $directory "silonr-offline.db"))) {
+      return (Resolve-Path $directory).Path
+    }
+  }
+
+  foreach ($root in @($env:APPDATA, $env:LOCALAPPDATA)) {
+    if (-not $root -or -not (Test-Path $root)) {
+      continue
+    }
+    $database = Get-ChildItem -Path $root -Filter "silonr-offline.db" -File -Recurse -ErrorAction SilentlyContinue |
+      Select-Object -First 1
+    if ($database) {
+      return $database.DirectoryName
+    }
+  }
+
+  return $null
+}
+
 function Assert-SiloLaunch([string]$Executable) {
   Write-Step "Validando inicialização do aplicativo"
   Write-Host "Executável: $Executable"
@@ -134,6 +162,9 @@ if (-not $nsis) {
 Write-Host "MSI:  $($msi.FullName)"
 Write-Host "NSIS: $($nsis.FullName)"
 
+$sentinelPath = $null
+$sentinelValue = "SILONR_INSTALLER_PRESERVES_OFFLINE_DATA"
+
 try {
   Write-Step "Instalação limpa via MSI"
   $msiInstallLog = Join-Path $env:RUNNER_TEMP "silonr-msi-install.log"
@@ -145,15 +176,35 @@ try {
   }
   Assert-SiloLaunch -Executable $msiExe
 
+  Write-Step "Validando inicialização do armazenamento offline"
+  $dataDirectory = Get-SiloDataDirectory
+  if (-not $dataDirectory) {
+    throw "O aplicativo iniciou, mas o banco local silonr-offline.db não foi localizado."
+  }
+  Write-Host "Diretório de dados: $dataDirectory"
+  $sentinelPath = Join-Path $dataDirectory "release-smoke-sentinel.txt"
+  Set-Content -Path $sentinelPath -Value $sentinelValue -Encoding UTF8 -NoNewline
+
   Write-Step "Desinstalação silenciosa do MSI"
   $msiUninstallLog = Join-Path $env:RUNNER_TEMP "silonr-msi-uninstall.log"
   Invoke-Msi -Mode "x" -Path $msi.FullName -LogPath $msiUninstallLog
   Start-Sleep -Seconds 3
 
-  Write-Step "Instalação limpa via NSIS"
+  if (-not (Test-Path $sentinelPath)) {
+    throw "A desinstalação MSI removeu o diretório de dados offline. Isso pode destruir rascunhos/evidências pendentes."
+  }
+  if ((Get-Content $sentinelPath -Raw) -ne $sentinelValue) {
+    throw "Dados locais foram alterados após a desinstalação MSI."
+  }
+
+  Write-Step "Instalação limpa via NSIS sobre dados offline preservados"
   $nsisInstall = Start-Process -FilePath $nsis.FullName -ArgumentList "/S" -Wait -PassThru
   if ($nsisInstall.ExitCode -ne 0) {
     throw "Instalador NSIS falhou com ExitCode=$($nsisInstall.ExitCode)"
+  }
+
+  if (-not (Test-Path $sentinelPath) -or (Get-Content $sentinelPath -Raw) -ne $sentinelValue) {
+    throw "A instalação NSIS não preservou os dados offline existentes."
   }
 
   $nsisExe = Get-SiloExecutable
@@ -161,6 +212,14 @@ try {
     throw "NSIS finalizou sem erro, mas o executável instalado do SiloNR não foi localizado."
   }
   Assert-SiloLaunch -Executable $nsisExe
+
+  $dataDirectoryAfterNsis = Get-SiloDataDirectory
+  if (-not $dataDirectoryAfterNsis -or -not (Test-Path (Join-Path $dataDirectoryAfterNsis "silonr-offline.db"))) {
+    throw "Banco offline não foi preservado/reaberto depois da instalação NSIS."
+  }
+  if (-not (Test-Path $sentinelPath) -or (Get-Content $sentinelPath -Raw) -ne $sentinelValue) {
+    throw "Dados offline existentes foram alterados depois de abrir a instalação NSIS."
+  }
 
   Write-Step "Desinstalação silenciosa do NSIS"
   $installDirectory = Split-Path -Parent $nsisExe
@@ -190,10 +249,18 @@ try {
     throw "Desinstalador NSIS falhou com ExitCode=$($nsisUninstall.ExitCode)"
   }
 
+  if (-not (Test-Path $sentinelPath) -or (Get-Content $sentinelPath -Raw) -ne $sentinelValue) {
+    throw "A desinstalação NSIS removeu ou alterou dados offline do usuário."
+  }
+
   Write-Step "Release gate do instalador Windows aprovado"
   Write-Host "MSI instalou, abriu e desinstalou."
   Write-Host "NSIS instalou, abriu e desinstalou."
+  Write-Host "O banco/diretório de dados offline permaneceu preservado na transição MSI → NSIS."
 } finally {
   Get-Process -Name "SiloNR", "silonr-desktop" -ErrorAction SilentlyContinue |
     Stop-Process -Force -ErrorAction SilentlyContinue
+  if ($sentinelPath -and (Test-Path $sentinelPath)) {
+    Remove-Item $sentinelPath -Force -ErrorAction SilentlyContinue
+  }
 }
