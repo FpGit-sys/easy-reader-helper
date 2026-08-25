@@ -1,0 +1,95 @@
+import { eq } from "drizzle-orm";
+import { getAuth } from "../src/server/auth";
+import { getDb, getPool } from "../src/server/db/client";
+import { facilities, memberships, organizations } from "../src/server/db/schema";
+import { licenses } from "../src/server/db/schema.extensions";
+
+const ADMIN_EMAIL = "ci-admin@silonr.test";
+const ADMIN_PASSWORD = "Silonr-CI-Password-2026!";
+
+const ids = {
+  organizationA: "30000000-0000-4000-8000-000000000001",
+  organizationB: "30000000-0000-4000-8000-000000000002",
+  facilityA: "40000000-0000-4000-8000-000000000001",
+  facilityB: "40000000-0000-4000-8000-000000000002",
+};
+
+async function main() {
+  const auth = getAuth();
+  await auth.api.createUser({
+    body: {
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
+      name: "CI Admin",
+      role: "admin",
+    },
+  });
+
+  const pool = getPool();
+  const authUserResult = await pool.query<{ id: string }>(
+    'select id from "user" where lower(email) = lower($1) limit 1',
+    [ADMIN_EMAIL],
+  );
+  const userId = authUserResult.rows[0]?.id;
+  if (!userId) throw new Error("CI_AUTH_USER_NOT_CREATED");
+
+  const db = getDb();
+  await db.delete(organizations).where(eq(organizations.id, ids.organizationA));
+  await db.delete(organizations).where(eq(organizations.id, ids.organizationB));
+
+  await db.insert(organizations).values([
+    { id: ids.organizationA, name: "CI Tenant A" },
+    { id: ids.organizationB, name: "CI Tenant B" },
+  ]);
+  await db.insert(facilities).values([
+    {
+      id: ids.facilityA,
+      organizationId: ids.organizationA,
+      name: "CI Unidade A",
+      city: "Rio Verde",
+      state: "GO",
+    },
+    {
+      id: ids.facilityB,
+      organizationId: ids.organizationB,
+      name: "CI Unidade B",
+      city: "Cristalina",
+      state: "GO",
+    },
+  ]);
+  await db.insert(memberships).values({
+    organizationId: ids.organizationA,
+    facilityId: null,
+    userId,
+    role: "admin_empresa",
+    active: true,
+  });
+  await db.insert(licenses).values({
+    organizationId: ids.organizationA,
+    plan: "professional",
+    status: "trial",
+    validUntil: new Date(Date.now() + 7 * 86_400_000),
+    maxFacilities: 2,
+    maxUsers: 5,
+    offlineGraceDays: 30,
+  });
+
+  console.log(
+    JSON.stringify({
+      email: ADMIN_EMAIL,
+      organizationA: ids.organizationA,
+      organizationB: ids.organizationB,
+      facilityA: ids.facilityA,
+      facilityB: ids.facilityB,
+    }),
+  );
+}
+
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await getPool().end().catch(() => undefined);
+  });
