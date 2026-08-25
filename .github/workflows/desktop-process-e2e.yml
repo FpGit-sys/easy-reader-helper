@@ -137,9 +137,6 @@ jobs:
           bunx drizzle-kit push --force
           bun run auth:migrate
 
-      - name: Seed tenant, pairing code and published checklist
-        run: bun run scripts/ci-http-seed.ts
-
       - name: Generate desktop resource icons
         run: bun run tauri icon src-tauri/icons/app-icon.svg
 
@@ -157,6 +154,9 @@ jobs:
           Xvfb :99 -screen 0 1366x900x24 >/tmp/silonr-xvfb.log 2>&1 &
           echo $! >/tmp/silonr-xvfb.pid
           sleep 2
+
+      - name: Seed tenant, fresh pairing code and published checklist
+        run: bun run scripts/ci-http-seed.ts
 
       - name: Exercise Tauri process, SQLite, outage, restart, evidence and conflict
         shell: bash
