@@ -32,14 +32,14 @@ const answerSchema = z.object({
   requirementId: z.string().uuid(),
   result: answerResultSchema,
   notes: z.string().trim().max(5000).default(""),
-  answeredAt: z.string().datetime().optional(),
+  answeredAt: z.string().datetime({ offset: true }).optional(),
 });
 
 const inspectionSnapshotPayloadSchema = z.object({
   siloId: z.string().uuid(),
   inspectionType: z.string().trim().min(1).max(160),
   notes: z.string().trim().max(5000).default(""),
-  startedAt: z.string().datetime(),
+  startedAt: z.string().datetime({ offset: true }),
   baseRevision: z.number().int().min(0),
   finalize: z.boolean().default(false),
   checklist: z.array(checklistPairSchema).min(1).max(1000),
@@ -50,7 +50,7 @@ export const offlineEventSchema = z.object({
   id: z.string().uuid(),
   type: z.literal("inspection.snapshot"),
   entityId: z.string().uuid(),
-  createdAt: z.string().datetime(),
+  createdAt: z.string().datetime({ offset: true }),
   payload: inspectionSnapshotPayloadSchema,
 });
 
