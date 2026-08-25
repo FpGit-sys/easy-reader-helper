@@ -8,26 +8,39 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getServerEnv } from "@/server/env";
 
 let client: S3Client | null = null;
+let downloadClient: S3Client | null = null;
 
-function getStorageClient() {
-  if (client) return client;
+function createStorageClient(endpoint?: string) {
   const env = getServerEnv();
 
   if (!env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY) {
     throw new Error("OBJECT_STORAGE_NOT_CONFIGURED");
   }
 
-  client = new S3Client({
+  return new S3Client({
     region: env.S3_REGION,
-    ...(env.S3_ENDPOINT ? { endpoint: env.S3_ENDPOINT } : {}),
+    ...(endpoint ? { endpoint } : {}),
     forcePathStyle: env.S3_FORCE_PATH_STYLE,
     credentials: {
       accessKeyId: env.S3_ACCESS_KEY_ID,
       secretAccessKey: env.S3_SECRET_ACCESS_KEY,
     },
   });
+}
 
+function getStorageClient() {
+  if (client) return client;
+  const env = getServerEnv();
+  client = createStorageClient(env.S3_ENDPOINT || undefined);
   return client;
+}
+
+function getDownloadStorageClient() {
+  if (downloadClient) return downloadClient;
+  const env = getServerEnv();
+  const endpoint = env.S3_PUBLIC_ENDPOINT || env.S3_ENDPOINT || undefined;
+  downloadClient = createStorageClient(endpoint);
+  return downloadClient;
 }
 
 function bucket() {
@@ -68,7 +81,7 @@ export async function putPrivateObject(input: {
 export async function createPrivateDownloadUrl(key: string, expiresInSeconds = 300) {
   const expiresIn = Math.max(30, Math.min(expiresInSeconds, 900));
   return getSignedUrl(
-    getStorageClient(),
+    getDownloadStorageClient(),
     new GetObjectCommand({ Bucket: bucket(), Key: key }),
     { expiresIn },
   );
