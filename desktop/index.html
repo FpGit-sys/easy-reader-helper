@@ -3,56 +3,167 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Configurar SiloNR</title>
+    <title>SiloNR Desktop</title>
     <link rel="stylesheet" href="./styles.css" />
     <script src="./app.js" defer></script>
   </head>
   <body>
-    <main class="shell">
-      <section class="brand-panel" aria-label="Sobre o SiloNR">
-        <div class="brand">SiloNR</div>
+    <header class="topbar">
+      <div>
+        <strong class="brand">SiloNR</strong>
+        <span class="product">Desktop</span>
+      </div>
+      <div class="topbar-actions">
+        <span id="connection-pill" class="pill neutral">Verificando instalação…</span>
+        <button id="open-online" class="button secondary compact" type="button" hidden>Abrir online</button>
+      </div>
+    </header>
+
+    <main class="page">
+      <section class="hero">
         <div>
-          <span class="eyebrow">Configuração do aplicativo</span>
-          <h1>Conecte este computador ao ambiente da sua empresa.</h1>
+          <span class="eyebrow">Operação local e sincronização controlada</span>
+          <h1>Inspeções continuam mesmo quando a internet não continua.</h1>
           <p>
-            Esta etapa é feita durante a implantação. O endereço deve ser fornecido pelo responsável
-            pela instalação do SiloNR.
+            O modo offline mantém checklist e respostas em um banco SQLite deste computador e envia
+            as alterações ao servidor quando a conexão voltar. O servidor continua sendo a fonte
+            oficial da operação.
           </p>
         </div>
-        <p class="footnote">
-          O SiloNR apoia a gestão de documentos, inspeções, evidências e ações. Não substitui
-          responsável técnico, auditoria ou fiscalização oficial.
-        </p>
+        <div class="hero-note">
+          <strong>Importante</strong>
+          <p>
+            Critérios que exigem evidência podem ser respondidos offline, mas a conclusão permanece
+            bloqueada até que a evidência seja anexada no fluxo online.
+          </p>
+        </div>
       </section>
 
-      <section class="form-panel">
-        <form id="server-form" class="card">
-          <div class="lock" aria-hidden="true">✓</div>
-          <h2>Servidor SiloNR</h2>
-          <p class="muted">
-            Em produção, utilize exclusivamente o endereço HTTPS entregue na implantação.
-          </p>
+      <div id="global-error" class="alert error" role="alert" hidden></div>
+      <div id="global-success" class="alert success" role="status" hidden></div>
 
-          <label for="server-url">Endereço do servidor</label>
-          <input
-            id="server-url"
-            name="server-url"
-            type="url"
-            inputmode="url"
-            autocomplete="url"
-            placeholder="https://silonr.suaempresa.com.br"
-            required
-          />
-
-          <div id="error" class="error" role="alert" hidden></div>
-          <button id="connect" type="submit">Conectar com segurança</button>
-
-          <p class="help">
-            HTTP só é aceito para <code>localhost</code> em desenvolvimento. O aplicativo não grava
-            usuário ou senha nesta tela.
-          </p>
+      <section id="pairing-section" class="panel" hidden>
+        <div class="section-heading">
+          <div>
+            <span class="step">1</span>
+            <h2>Ativar este computador</h2>
+            <p>Use um código temporário gerado por um usuário autorizado no SiloNR online.</p>
+          </div>
+        </div>
+        <form id="pairing-form" class="form-grid">
+          <label class="field span-2">
+            <span>Endereço do servidor</span>
+            <input id="server-url" type="url" placeholder="https://silonr.suaempresa.com.br" required />
+          </label>
+          <label class="field">
+            <span>Código de ativação</span>
+            <input id="pairing-code" type="text" autocomplete="one-time-code" placeholder="XXXXXX-XXXXXX-XXXXXX" required />
+          </label>
+          <label class="field">
+            <span>Nome deste computador</span>
+            <input id="device-name" type="text" maxlength="120" placeholder="PC Inspeção - Unidade 01" />
+          </label>
+          <div class="span-2 actions-row">
+            <button id="pair-device" class="button primary" type="submit">Ativar e baixar dados offline</button>
+          </div>
         </form>
       </section>
+
+      <section id="workspace-section" hidden>
+        <div class="metrics">
+          <article class="metric">
+            <span>Empresa / unidade</span>
+            <strong id="workspace-name">—</strong>
+          </article>
+          <article class="metric">
+            <span>Pacote offline</span>
+            <strong id="pack-date">—</strong>
+          </article>
+          <article class="metric">
+            <span>Operação offline válida até</span>
+            <strong id="offline-until">—</strong>
+          </article>
+          <article class="metric">
+            <span>Fila de sincronização</span>
+            <strong id="pending-count">0</strong>
+          </article>
+        </div>
+
+        <section class="panel sync-panel">
+          <div>
+            <h2>Sincronização</h2>
+            <p>
+              O SiloNR envia somente eventos pendentes. Eventos já aceitos possuem identificador
+              idempotente e não são aplicados duas vezes no servidor.
+            </p>
+          </div>
+          <div class="button-group">
+            <button id="refresh-pack" class="button secondary" type="button">Atualizar pacote</button>
+            <button id="sync-now" class="button primary" type="button">Sincronizar agora</button>
+          </div>
+        </section>
+
+        <section class="work-grid">
+          <div class="panel">
+            <div class="section-heading inline">
+              <div>
+                <span class="step">2</span>
+                <h2>Nova inspeção offline</h2>
+                <p>O checklist é congelado a partir do último pacote baixado.</p>
+              </div>
+            </div>
+            <form id="new-inspection-form" class="stack">
+              <label class="field">
+                <span>Silo</span>
+                <select id="silo-select" required></select>
+              </label>
+              <label class="field">
+                <span>Tipo de inspeção</span>
+                <input id="inspection-type" type="text" maxlength="160" value="Inspeção operacional" required />
+              </label>
+              <label class="field">
+                <span>Observações iniciais</span>
+                <textarea id="inspection-notes" rows="3" maxlength="5000"></textarea>
+              </label>
+              <button id="start-inspection" class="button primary" type="submit">Iniciar inspeção local</button>
+            </form>
+          </div>
+
+          <div class="panel">
+            <div class="section-heading inline">
+              <div>
+                <span class="step">3</span>
+                <h2>Inspeções neste computador</h2>
+                <p>Rascunhos, pendências de sync e conflitos ficam visíveis aqui.</p>
+              </div>
+            </div>
+            <div id="inspection-list" class="inspection-list">
+              <p class="empty">Nenhuma inspeção local.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="inspection-detail" class="panel detail-panel" hidden>
+          <div class="detail-header">
+            <div>
+              <span id="detail-state" class="pill neutral">Local</span>
+              <h2 id="detail-title">Inspeção</h2>
+              <p id="detail-meta"></p>
+            </div>
+            <div class="button-group">
+              <button id="close-detail" class="button secondary" type="button">Fechar</button>
+              <button id="finalize-local" class="button primary" type="button">Solicitar conclusão</button>
+            </div>
+          </div>
+          <div id="detail-error" class="alert warning" hidden></div>
+          <div id="checklist" class="checklist"></div>
+        </section>
+      </section>
     </main>
+
+    <footer class="footer">
+      <span>SiloNR Desktop · dados offline armazenados no perfil local deste usuário Windows.</span>
+      <span>O software apoia a gestão e não substitui responsável técnico, auditoria ou fiscalização.</span>
+    </footer>
   </body>
 </html>
