@@ -21,7 +21,7 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=$repo_root
 Environment=SILONR_ENV_FILE=$env_file
-ExecStart=$repo_root/ops/$command
+ExecStart=/usr/bin/bash $repo_root/ops/$command
 User=root
 NoNewPrivileges=true
 PrivateTmp=true
