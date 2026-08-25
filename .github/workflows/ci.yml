@@ -155,6 +155,52 @@ jobs:
             exit 1
           fi
 
+          activation_status=$(curl --silent --show-error --output /tmp/silonr-activation.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/offline/activate \
+            --header 'content-type: application/json' \
+            --data '{"code":"CI2026-ACTIVE-OFFLINE","fingerprint":"ci-installation-fingerprint-00000001","name":"CI Windows Desktop","platform":"windows","appVersion":"0.1.0"}')
+          if [ "$activation_status" != "201" ]; then
+            echo "Expected desktop activation to return 201, got $activation_status"
+            cat /tmp/silonr-activation.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          device_token=$(bun -e 'const value = JSON.parse(await Bun.file("/tmp/silonr-activation.json").text()); if (!value.token) process.exit(1); process.stdout.write(value.token)')
+          bootstrap_status=$(curl --silent --show-error --output /tmp/silonr-bootstrap.json --write-out '%{http_code}' \
+            --header "authorization: Bearer $device_token" \
+            http://127.0.0.1:3000/api/offline/bootstrap)
+          if [ "$bootstrap_status" != "200" ]; then
+            echo "Expected paired desktop bootstrap to return 200, got $bootstrap_status"
+            cat /tmp/silonr-bootstrap.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+          grep -q '"protocolVersion":1' /tmp/silonr-bootstrap.json
+          grep -q '"organizationId":"30000000-0000-4000-8000-000000000001"' /tmp/silonr-bootstrap.json
+          grep -q '"facilityId":"40000000-0000-4000-8000-000000000001"' /tmp/silonr-bootstrap.json
+
+          reused_pairing_status=$(curl --silent --show-error --output /tmp/silonr-reused-pairing.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/offline/activate \
+            --header 'content-type: application/json' \
+            --data '{"code":"CI2026-ACTIVE-OFFLINE","fingerprint":"ci-installation-fingerprint-00000002","name":"Second Desktop","platform":"windows","appVersion":"0.1.0"}')
+          if [ "$reused_pairing_status" != "401" ]; then
+            echo "Expected one-time pairing code reuse to return 401, got $reused_pairing_status"
+            cat /tmp/silonr-reused-pairing.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          invalid_device_status=$(curl --silent --show-error --output /tmp/silonr-invalid-device.json --write-out '%{http_code}' \
+            --header 'authorization: Bearer slnr_invalid_device_token' \
+            http://127.0.0.1:3000/api/offline/bootstrap)
+          if [ "$invalid_device_status" != "401" ]; then
+            echo "Expected invalid device bearer to return 401, got $invalid_device_status"
+            cat /tmp/silonr-invalid-device.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
           cross_site_status=$(curl --silent --show-error --cookie /tmp/silonr-cookies.txt --output /tmp/silonr-cross-site.json --write-out '%{http_code}' \
             --request POST http://127.0.0.1:3000/api/documents/upload \
             --header 'origin: https://attacker.invalid')
