@@ -111,21 +111,62 @@ function Get-SiloDataDirectory {
   return $null
 }
 
-function Assert-SiloLaunch([string]$Executable) {
+function Assert-SiloLaunch([string]$Executable, [switch]$RequireOfflineStorage) {
   Write-Step "Validando inicialização do aplicativo"
   Write-Host "Executável: $Executable"
 
   $process = Start-Process -FilePath $Executable -PassThru
-  Start-Sleep -Seconds 8
-  $process.Refresh()
+  $dataDirectory = $null
+  try {
+    Start-Sleep -Seconds 8
+    $process.Refresh()
 
-  if ($process.HasExited) {
-    throw "O SiloNR encerrou imediatamente após a instalação. ExitCode=$($process.ExitCode)"
+    if ($process.HasExited) {
+      throw "O SiloNR encerrou imediatamente após a instalação. ExitCode=$($process.ExitCode)"
+    }
+
+    Write-Host "Aplicativo permaneceu ativo por 8 segundos. Smoke de inicialização aprovado."
+
+    if ($RequireOfflineStorage) {
+      Write-Step "Aguardando inicialização do armazenamento offline"
+      $deadline = (Get-Date).AddSeconds(45)
+      while ((Get-Date) -lt $deadline) {
+        $process.Refresh()
+        if ($process.HasExited) {
+          throw "O SiloNR encerrou antes de inicializar o armazenamento offline. ExitCode=$($process.ExitCode)"
+        }
+
+        $dataDirectory = Get-SiloDataDirectory
+        if ($dataDirectory) {
+          Write-Host "Diretório de dados: $dataDirectory"
+          break
+        }
+        Start-Sleep -Seconds 1
+      }
+
+      if (-not $dataDirectory) {
+        Write-Host "APPDATA: $env:APPDATA"
+        Write-Host "LOCALAPPDATA: $env:LOCALAPPDATA"
+        foreach ($root in @($env:APPDATA, $env:LOCALAPPDATA)) {
+          if ($root -and (Test-Path $root)) {
+            Write-Host "--- diretórios SiloNR em $root ---"
+            Get-ChildItem -Path $root -Directory -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -match "silonr|br\.com\.silonr" } |
+              Select-Object -First 40 -ExpandProperty FullName |
+              ForEach-Object { Write-Host $_ }
+          }
+        }
+        throw "O aplicativo iniciou, mas o banco local silonr-offline.db não foi localizado após 45 segundos."
+      }
+    }
+
+    return $dataDirectory
+  } finally {
+    if ($process -and -not $process.HasExited) {
+      Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+    }
+    Start-Sleep -Seconds 2
   }
-
-  Write-Host "Aplicativo permaneceu ativo por 8 segundos. Smoke de inicialização aprovado."
-  Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-  Start-Sleep -Seconds 2
 }
 
 function Invoke-Msi([string]$Mode, [string]$Path, [string]$LogPath) {
@@ -174,14 +215,7 @@ try {
   if (-not $msiExe) {
     throw "MSI finalizou sem erro, mas o executável instalado do SiloNR não foi localizado."
   }
-  Assert-SiloLaunch -Executable $msiExe
-
-  Write-Step "Validando inicialização do armazenamento offline"
-  $dataDirectory = Get-SiloDataDirectory
-  if (-not $dataDirectory) {
-    throw "O aplicativo iniciou, mas o banco local silonr-offline.db não foi localizado."
-  }
-  Write-Host "Diretório de dados: $dataDirectory"
+  $dataDirectory = Assert-SiloLaunch -Executable $msiExe -RequireOfflineStorage
   $sentinelPath = Join-Path $dataDirectory "release-smoke-sentinel.txt"
   Set-Content -Path $sentinelPath -Value $sentinelValue -Encoding UTF8 -NoNewline
 
@@ -211,9 +245,7 @@ try {
   if (-not $nsisExe) {
     throw "NSIS finalizou sem erro, mas o executável instalado do SiloNR não foi localizado."
   }
-  Assert-SiloLaunch -Executable $nsisExe
-
-  $dataDirectoryAfterNsis = Get-SiloDataDirectory
+  $dataDirectoryAfterNsis = Assert-SiloLaunch -Executable $nsisExe -RequireOfflineStorage
   if (-not $dataDirectoryAfterNsis -or -not (Test-Path (Join-Path $dataDirectoryAfterNsis "silonr-offline.db"))) {
     throw "Banco offline não foi preservado/reaberto depois da instalação NSIS."
   }
