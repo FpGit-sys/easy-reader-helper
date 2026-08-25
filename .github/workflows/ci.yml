@@ -155,6 +155,16 @@ jobs:
             exit 1
           fi
 
+          cross_site_status=$(curl --silent --show-error --cookie /tmp/silonr-cookies.txt --output /tmp/silonr-cross-site.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/documents/upload \
+            --header 'origin: https://attacker.invalid')
+          if [ "$cross_site_status" != "403" ]; then
+            echo "Expected cross-site mutation to return 403, got $cross_site_status"
+            cat /tmp/silonr-cross-site.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
           printf '%%PDF-1.7\n1 0 obj\n' > /tmp/valid.pdf
           cross_tenant_status=$(curl --silent --show-error --cookie /tmp/silonr-cookies.txt --output /tmp/silonr-cross-tenant.json --write-out '%{http_code}' \
             --request POST http://127.0.0.1:3000/api/documents/upload \
