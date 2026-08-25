@@ -4,6 +4,7 @@ const serverEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   APP_URL: z.string().url().default("http://localhost:3000"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL é obrigatória."),
+  DATABASE_SSL_MODE: z.enum(["disable", "verify-full"]).optional(),
   BETTER_AUTH_URL: z.string().url().default("http://localhost:3000"),
   BETTER_AUTH_SECRET: z.string().min(32, "BETTER_AUTH_SECRET deve ter no mínimo 32 caracteres."),
   ALLOW_PUBLIC_SIGNUP: z
