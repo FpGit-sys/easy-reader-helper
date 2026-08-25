@@ -23,7 +23,7 @@ Evidência: workflow `SiloNR CI`.
 - [x] RBAC server-side;
 - [x] silos persistidos;
 - [x] requisitos versionados e fontes rastreáveis;
-- [x] documentos privados e versionados;
+- [x] documents privados e versionados;
 - [x] inspeções com snapshot imutável;
 - [x] evidências privadas;
 - [x] não conformidades e ações corretivas;
@@ -43,10 +43,10 @@ Evidência: workflow `SiloNR CI`.
 - [x] NSIS desinstala no smoke test;
 - [x] artefatos são publicados apenas quando o smoke de instalação passa;
 - [ ] token de dispositivo efetivamente armazenado com proteção Windows DPAPI/credencial equivalente, sem plaintext reutilizável no SQLite;
-- [ ] teste de upgrade de versão preservando rascunhos/evidências offline pendentes;
+- [x] troca/reinstalação de instalador preserva diretório de dados, banco SQLite e sentinel que representa rascunhos/evidências offline pendentes;
 - [ ] assinatura Authenticode do instalador/binário para distribuição comercial (ou decisão formal de piloto controlado sem assinatura).
 
-Evidência atual: workflow `SiloNR Windows Desktop` e `scripts/windows-installer-smoke.ps1`.
+Evidência atual: workflow `SiloNR Windows Desktop` e `scripts/windows-installer-smoke.ps1`. O smoke executa instalação, abertura, desinstalação e transição MSI → NSIS sem apagar o diretório de dados do usuário.
 
 ## Gate D — Offline e sincronização
 
@@ -59,7 +59,10 @@ Evidência atual: workflow `SiloNR Windows Desktop` e `scripts/windows-installer
 - [x] idempotência do protocolo no servidor;
 - [x] conflito explícito de revisão em vez de last-write-wins;
 - [x] conclusão somente depois de rascunho/evidência aceitos no servidor;
-- [ ] E2E automatizado Desktop real → servidor real cobrindo pareamento, inspeção, foto, perda de rede, reconexão, sync, conflito e conclusão.
+- [x] E2E do protocolo offline contra servidor real de CI com PostgreSQL + MinIO: pareamento, bootstrap, snapshot, replay idempotente, conflito de revisão, upload de foto, replay da evidência, conclusão e criação de não conformidade;
+- [ ] E2E do processo Tauri/SQLite real → servidor cobrindo o ciclo completo e a retomada após indisponibilidade de rede.
+
+Evidência: workflow `SiloNR Offline Protocol E2E`, além dos testes do servidor e do cliente desktop.
 
 ## Gate E — Continuidade operacional
 
@@ -73,7 +76,7 @@ Evidência atual: workflow `SiloNR Windows Desktop` e `scripts/windows-installer
 - [x] drill automatizado: schema real → backup → banco isolado → restore → verificação de sentinel e tabelas;
 - [x] procedimento de backup de object storage;
 - [ ] teste em staging com o provedor real escolhido para PostgreSQL + storage S3-compatible + HTTPS;
-- [ ] monitoramento/alerta real configurado para health checks e erros 5xx;
+- [ ] monitoramento/alerta real configurado para health checks e erros 5xx.
 
 Evidência atual: workflow `SiloNR Backup Restore Drill` e diretório `ops/`.
 
