@@ -89,13 +89,19 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Create test schema
+      - name: Create application test schema
         run: bunx drizzle-kit push --force
 
       - name: Cross-tenant integration tests
         run: bun run test:integration
 
-      - name: HTTP security smoke
+      - name: Create authentication test schema
+        run: bun run auth:migrate
+
+      - name: Seed authenticated security scenario
+        run: bun run scripts/ci-http-seed.ts
+
+      - name: HTTP security E2E
         shell: bash
         run: |
           set -euo pipefail
@@ -123,10 +129,59 @@ jobs:
           grep -Eqi '^x-frame-options:[[:space:]]*DENY' /tmp/silonr-headers.txt
           grep -Eqi '^referrer-policy:[[:space:]]*no-referrer' /tmp/silonr-headers.txt
 
-          upload_status=$(curl --silent --show-error --output /tmp/silonr-upload.json --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/documents/upload)
-          if [ "$upload_status" != "401" ]; then
-            echo "Expected unauthenticated document upload to return 401, got $upload_status"
-            cat /tmp/silonr-upload.json || true
+          unauth_upload_status=$(curl --silent --show-error --output /tmp/silonr-unauth-upload.json --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/documents/upload)
+          if [ "$unauth_upload_status" != "401" ]; then
+            echo "Expected unauthenticated document upload to return 401, got $unauth_upload_status"
+            cat /tmp/silonr-unauth-upload.json || true
             cat /tmp/silonr-vite.log
             exit 1
           fi
+
+          sign_in_status=$(curl --silent --show-error --cookie-jar /tmp/silonr-cookies.txt --output /tmp/silonr-signin.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/auth/sign-in/email \
+            --header 'content-type: application/json' \
+            --data '{"email":"ci-admin@silonr.test","password":"Silonr-CI-Password-2026!","rememberMe":false}')
+          if [ "$sign_in_status" != "200" ]; then
+            echo "Expected sign-in to return 200, got $sign_in_status"
+            cat /tmp/silonr-signin.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          app_status=$(curl --silent --show-error --cookie /tmp/silonr-cookies.txt --output /tmp/silonr-overview.html --write-out '%{http_code}' http://127.0.0.1:3000/app/overview)
+          if [ "$app_status" != "200" ]; then
+            echo "Expected authenticated app route to return 200, got $app_status"
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          printf '%%PDF-1.7\n1 0 obj\n' > /tmp/valid.pdf
+          cross_tenant_status=$(curl --silent --show-error --cookie /tmp/silonr-cookies.txt --output /tmp/silonr-cross-tenant.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/documents/upload \
+            --form 'organizationId=30000000-0000-4000-8000-000000000002' \
+            --form 'facilityId=40000000-0000-4000-8000-000000000002' \
+            --form 'name=Documento intruso' \
+            --form 'category=Teste' \
+            --form 'file=@/tmp/valid.pdf;type=application/pdf;filename=teste.pdf')
+          if [ "$cross_tenant_status" != "403" ]; then
+            echo "Expected cross-tenant upload to return 403, got $cross_tenant_status"
+            cat /tmp/silonr-cross-tenant.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          printf '\x4d\x5a\x90\x00\x03\x00\x00\x00' > /tmp/disguised.exe
+          disguised_status=$(curl --silent --show-error --cookie /tmp/silonr-cookies.txt --output /tmp/silonr-disguised.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/documents/upload \
+            --form 'organizationId=30000000-0000-4000-8000-000000000001' \
+            --form 'facilityId=40000000-0000-4000-8000-000000000001' \
+            --form 'name=Arquivo disfarçado' \
+            --form 'category=Teste' \
+            --form 'file=@/tmp/disguised.exe;type=application/pdf;filename=laudo.pdf')
+          if [ "$disguised_status" != "400" ]; then
+            echo "Expected disguised executable to return 400, got $disguised_status"
+            cat /tmp/silonr-disguised.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+          grep -q 'FILE_CONTENT_MISMATCH' /tmp/silonr-disguised.json
