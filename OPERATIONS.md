@@ -182,3 +182,28 @@ O SiloNR só deve ser instalado em unidade piloto quando:
 - cliente tiver usuários, unidade e checklist reais validados;
 - fontes externas reais, quando usadas, tiverem validação rastreável;
 - responsável do piloto entender que o indicador é prontidão interna e não certificação automática.
+
+
+## 11. Staging/piloto em VPS única
+
+O pacote operacional do primeiro staging está documentado em `STAGING_PILOT.md`. Depois de preencher `deploy/pilot/.env`:
+
+```bash
+sudo bash ops/pilot-deploy.sh
+sudo bash ops/install-pilot-systemd.sh
+sudo systemctl start silonr-backup.service
+sudo systemctl start silonr-restore-drill.service
+```
+
+Os timers executam monitoramento a cada minuto, backup diário e restore isolado semanal. O monitor alerta após três falhas consecutivas e envia recuperação; o backup copia banco e objetos para um bucket externo com credencial separada.
+
+Operação diária:
+
+```bash
+systemctl list-timers 'silonr-*'
+journalctl -u silonr-monitor.service --since today
+journalctl -u silonr-backup.service --since '7 days ago'
+ls -l /var/backups/silonr/evidence
+```
+
+Falha de backup ou restore é incidente operacional. Não silencie o timer: corrija a causa, execute novamente e preserve a evidência do resultado.
