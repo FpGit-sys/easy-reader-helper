@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
@@ -34,6 +34,21 @@ jobs:
 
       - name: Verify lockfile against package manifest
         run: bun install --frozen-lockfile
+
+      - name: Commit lockfile candidate
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain -- bun.lock)" ]; then
+            echo "bun.lock is already synchronized."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bun.lock
+          git commit -m "Refresh Bun lockfile"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Upload reviewed lockfile candidate
         uses: actions/upload-artifact@v4
