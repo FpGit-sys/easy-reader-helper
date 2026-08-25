@@ -15,7 +15,7 @@ export default defineConfig({
         entry: "server",
       },
     }),
-    nitro(),
+    nitro({ preset: "node-server" }),
     viteReact(),
     tailwindcss(),
     tsconfigPaths(),
