@@ -48,26 +48,11 @@ services:
       until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do sleep 2; done;
       mc mb --ignore-existing "local/$${S3_BUCKET}";
       mc anonymous set none "local/$${S3_BUCKET}";
-      cat > /tmp/silonr-app-policy.json <<EOF
-      {
-        "Version": "2012-10-17",
-        "Statement": [
-          {
-            "Effect": "Allow",
-            "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
-            "Resource": ["arn:aws:s3:::$${S3_BUCKET}"]
-          },
-          {
-            "Effect": "Allow",
-            "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-            "Resource": ["arn:aws:s3:::$${S3_BUCKET}/*"]
-          }
-        ]
-      }
-      EOF
+      printf "%s" "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:ListBucket\",\"s3:GetBucketLocation\"],\"Resource\":[\"arn:aws:s3:::$${S3_BUCKET}\"]},{\"Effect\":\"Allow\",\"Action\":[\"s3:GetObject\",\"s3:PutObject\",\"s3:DeleteObject\"],\"Resource\":[\"arn:aws:s3:::$${S3_BUCKET}/*\"]}]}" > /tmp/silonr-app-policy.json;
       mc admin user add local "$${S3_ACCESS_KEY_ID}" "$${S3_SECRET_ACCESS_KEY}" >/dev/null 2>&1 || \
         mc admin user enable local "$${S3_ACCESS_KEY_ID}" >/dev/null;
-      mc admin policy create local silonr-app /tmp/silonr-app-policy.json >/dev/null;
+      mc admin policy create local silonr-app /tmp/silonr-app-policy.json >/dev/null 2>&1 || \
+        mc admin policy info local silonr-app >/dev/null;
       mc admin policy attach local silonr-app --user "$${S3_ACCESS_KEY_ID}" >/dev/null;
       '
     networks:
