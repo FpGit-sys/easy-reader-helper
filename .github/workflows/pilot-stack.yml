@@ -11,6 +11,8 @@ on:
       - "docker-compose.pilot.yml"
       - "deploy/pilot/**"
       - "scripts/pilot-preflight.sh"
+      - "ops/pilot-*.sh"
+      - "ops/install-pilot-systemd.sh"
       - "src/server/env.ts"
       - "src/server/files/storage.ts"
       - "package.json"
@@ -25,6 +27,8 @@ on:
       - "docker-compose.pilot.yml"
       - "deploy/pilot/**"
       - "scripts/pilot-preflight.sh"
+      - "ops/pilot-*.sh"
+      - "ops/install-pilot-systemd.sh"
       - "src/server/env.ts"
       - "src/server/files/storage.ts"
       - "package.json"
@@ -51,6 +55,13 @@ env:
   S3_ACCESS_KEY_ID: silonr-ci-app
   S3_SECRET_ACCESS_KEY: ci-minio-app-secret-2026-not-production
   S3_BUCKET: silonr-private
+  PILOT_ALERT_WEBHOOK_URL: https://alerts.silonr.invalid/hooks/ci
+  PILOT_BACKUP_DIR: /tmp/silonr-pilot-backups
+  PILOT_BACKUP_S3_ENDPOINT: https://backup.silonr.invalid
+  PILOT_BACKUP_S3_ACCESS_KEY_ID: silonr-ci-backup
+  PILOT_BACKUP_S3_SECRET_ACCESS_KEY: ci-external-backup-secret-2026-not-production
+  PILOT_BACKUP_S3_BUCKET: silonr-ci-backup-external
+  PILOT_BACKUP_PREFIX: ci
   SILONR_PREFLIGHT_ALLOW_TEST_VALUES: "true"
 
 jobs:
@@ -60,6 +71,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Validate operations shell scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/pilot-preflight.sh
+          bash -n ops/pilot-deploy.sh
+          bash -n ops/pilot-monitor.sh
+          bash -n ops/pilot-backup.sh
+          bash -n ops/pilot-restore-drill.sh
+          bash -n ops/install-pilot-systemd.sh
 
       - name: Create CI compose override
         shell: bash
