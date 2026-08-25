@@ -15,6 +15,8 @@ use uuid::Uuid;
 
 const PROTOCOL_VERSION: i32 = 1;
 const MAX_EVIDENCE_BYTES: usize = 15 * 1024 * 1024;
+const DEVICE_TOKEN_META_KEY: &str = "device_token";
+const DEVICE_TOKEN_PREFIX: &str = "dpapi:v1:";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -318,6 +320,38 @@ fn set_meta(conn: &Connection, key: &str, value: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn store_device_token(conn: &Connection, token: &str) -> Result<(), String> {
+    let protected = super::secure_store::protect(token)
+        .map_err(|error| format!("SECURE_STORE_PROTECT_FAILED:{error}"))?;
+    set_meta(
+        conn,
+        DEVICE_TOKEN_META_KEY,
+        &format!("{DEVICE_TOKEN_PREFIX}{protected}"),
+    )
+}
+
+fn load_device_token(conn: &Connection) -> Result<Option<String>, String> {
+    let Some(stored) = get_meta(conn, DEVICE_TOKEN_META_KEY)? else {
+        return Ok(None);
+    };
+
+    if let Some(ciphertext) = stored.strip_prefix(DEVICE_TOKEN_PREFIX) {
+        let token = super::secure_store::unprotect(ciphertext)
+            .map_err(|error| format!("SECURE_STORE_UNPROTECT_FAILED:{error}"))?;
+        return Ok(Some(token));
+    }
+
+    // Legacy migration: older desktop builds stored the device bearer token as
+    // plaintext in SQLite. The first authenticated/status read rewrites it with
+    // Windows DPAPI before returning it to memory.
+    store_device_token(conn, &stored)?;
+    Ok(Some(stored))
+}
+
+fn require_device_token(conn: &Connection) -> Result<String, String> {
+    load_device_token(conn)?.ok_or_else(|| "DEVICE_NOT_PAIRED".to_string())
+}
+
 fn install_id(conn: &Connection) -> Result<String, String> {
     if let Some(value) = get_meta(conn, "install_id")? {
         return Ok(value);
@@ -382,7 +416,7 @@ async fn refresh_pack_internal(app: &AppHandle) -> Result<OfflinePack, String> {
     let server_url = current_server_url(app)?;
     let token = {
         let conn = open_db(app)?;
-        get_meta(&conn, "device_token")?.ok_or_else(|| "DEVICE_NOT_PAIRED".to_string())?
+        require_device_token(&conn)?
     };
 
     let response = http_client()?
@@ -489,7 +523,7 @@ pub async fn pair_device(
         {
             clear_local_workspace(&app, &conn)?;
         }
-        set_meta(&conn, "device_token", &activation.token)?;
+        store_device_token(&conn, &activation.token)?;
         set_meta(&conn, "device_id", &activation.device_id)?;
         set_meta(&conn, "organization_id", &activation.organization_id)?;
         set_meta(&conn, "facility_id", &activation.facility_id)?;
@@ -518,7 +552,7 @@ fn desktop_status_inner(app: &AppHandle) -> Result<DesktopStatus, String> {
     let conn = open_db(app)?;
     let server_url = super::read_config(app)?.map(|config| config.server_url);
     let device_id = get_meta(&conn, "device_id")?;
-    let paired = get_meta(&conn, "device_token")?.is_some();
+    let paired = load_device_token(&conn)?.is_some();
     let snapshot_events: i64 = conn.query_row("SELECT COUNT(*) FROM outbox", [], |row| row.get(0))
         .map_err(|error| format!("Falha ao contar pendências locais: {error}"))?;
     let finalize_events: i64 = conn.query_row("SELECT COUNT(*) FROM finalize_outbox", [], |row| row.get(0))
@@ -831,7 +865,7 @@ pub async fn sync_now(app: AppHandle, window: WebviewWindow) -> Result<DesktopSt
     let server_url = current_server_url(&app)?;
     let token = {
         let conn = open_db(&app)?;
-        get_meta(&conn, "device_token")?.ok_or_else(|| "DEVICE_NOT_PAIRED".to_string())?
+        require_device_token(&conn)?
     };
 
     sync_json_outbox(&app, &server_url, &token, "outbox").await?;

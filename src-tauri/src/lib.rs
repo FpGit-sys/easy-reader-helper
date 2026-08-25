@@ -1,4 +1,5 @@
 mod offline_v2;
+mod secure_store;
 
 use offline_v2 as offline;
 use serde::{Deserialize, Serialize};
