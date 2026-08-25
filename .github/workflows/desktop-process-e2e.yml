@@ -60,6 +60,9 @@ env:
   DISPLAY: :99
   WEBKIT_DISABLE_COMPOSITING_MODE: "1"
   LIBGL_ALWAYS_SOFTWARE: "1"
+  XDG_DATA_HOME: /tmp/silonr-desktop-e2e/data
+  XDG_CONFIG_HOME: /tmp/silonr-desktop-e2e/config
+  XDG_CACHE_HOME: /tmp/silonr-desktop-e2e/cache
 
 jobs:
   tauri-sqlite-real-process:
@@ -83,6 +86,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare isolated desktop state
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/silonr-desktop-e2e
+          mkdir -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME"
+
       - name: Install Tauri and WebDriver system dependencies
         shell: bash
         run: |
@@ -95,6 +105,7 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libssl-dev \
+            sqlite3 \
             webkit2gtk-driver \
             xvfb
           which WebKitWebDriver
@@ -164,6 +175,23 @@ jobs:
           SILONR_DESKTOP_BINARY: ${{ github.workspace }}/src-tauri/target/debug/silonr-desktop
         run: python3 scripts/desktop-webdriver-e2e.py
 
+      - name: Verify real local SQLite state exists after process E2E
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB_PATH="$(find "$XDG_DATA_HOME" -type f -name 'silonr-offline.db' -print -quit)"
+          test -n "$DB_PATH"
+          echo "Desktop SQLite: $DB_PATH"
+          sqlite3 "$DB_PATH" "PRAGMA integrity_check;" | grep -Fx "ok"
+          sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM local_inspections;"
+          sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM local_evidence;"
+          TOKEN_VALUE="$(sqlite3 "$DB_PATH" "SELECT value FROM local_meta WHERE key='device_token';")"
+          case "$TOKEN_VALUE" in
+            dpapi:v1:*) ;;
+            *) echo "device token is not stored using the protected v1 envelope" >&2; exit 1 ;;
+          esac
+
       - name: Show desktop E2E diagnostics on failure
         if: failure()
         shell: bash
@@ -174,6 +202,8 @@ jobs:
           tail -n 300 /tmp/silonr-tauri-driver.log 2>/dev/null || true
           echo '--- xvfb ---'
           tail -n 100 /tmp/silonr-xvfb.log 2>/dev/null || true
+          echo '--- desktop state files ---'
+          find /tmp/silonr-desktop-e2e -maxdepth 6 -type f -print 2>/dev/null || true
           echo '--- processes ---'
           ps aux | grep -E 'silonr|tauri-driver|WebKitWebDriver|Xvfb' || true
 
