@@ -6,7 +6,7 @@ import {
   pairingCodeHash,
   tokenHash,
 } from "@/server/offline/crypto";
-import { calculateOfflineAllowedUntil } from "@/server/offline/device-auth";
+import { calculateOfflineAllowedUntil } from "@/server/offline/device-auth";\nimport { offlineEventSchema } from "@/server/offline/sync";
 
 describe("protocolo offline", () => {
   it("normaliza código de ativação sem depender da formatação exibida", () => {
@@ -28,6 +28,39 @@ describe("protocolo offline", () => {
     expect(first).not.toBe(second);
     expect(tokenHash(first)).toMatch(/^[a-f0-9]{64}$/);
     expect(tokenHash(first)).not.toContain(first);
+  });
+
+  it("aceita timestamps RFC3339 com offset produzidos pelo desktop", () => {
+    const parsed = offlineEventSchema.safeParse({
+      id: "61000000-0000-4000-8000-000000000001",
+      type: "inspection.snapshot",
+      entityId: "62000000-0000-4000-8000-000000000001",
+      createdAt: "2026-08-25T07:28:06+00:00",
+      payload: {
+        siloId: "63000000-0000-4000-8000-000000000001",
+        inspectionType: "Inspeção offline",
+        notes: "",
+        startedAt: "2026-08-25T04:28:06-03:00",
+        baseRevision: 0,
+        finalize: false,
+        checklist: [
+          {
+            requirementId: "64000000-0000-4000-8000-000000000001",
+            requirementVersionId: "65000000-0000-4000-8000-000000000001",
+          },
+        ],
+        answers: [
+          {
+            requirementId: "64000000-0000-4000-8000-000000000001",
+            result: "atendido",
+            notes: "",
+            answeredAt: "2026-08-25T07:28:06+00:00",
+          },
+        ],
+      },
+    });
+
+    expect(parsed.success).toBe(true);
   });
 
   it("limita a janela offline ao menor valor entre grace e validade da licença", () => {
