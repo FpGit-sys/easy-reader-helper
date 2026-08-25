@@ -8,7 +8,7 @@ RUN bun install --frozen-lockfile
 
 COPY . .
 ENV VITE_ENABLE_DEMO=false
-RUN bun run routes:generate && bun run build
+RUN bun run routes:generate && bun run typecheck && bun run build
 
 # Reusable target for controlled database/auth migrations in Compose.
 FROM build AS migrate
