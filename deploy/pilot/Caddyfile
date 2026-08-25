@@ -4,9 +4,17 @@
 
 {$SILONR_DOMAIN} {
   encode zstd gzip
+  log {
+    output stdout
+    format json
+  }
   reverse_proxy app:3000
 }
 
 {$SILONR_FILES_DOMAIN} {
+  log {
+    output stdout
+    format json
+  }
   reverse_proxy minio:9000
 }
