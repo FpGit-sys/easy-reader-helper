@@ -1,0 +1,12 @@
+{
+  email {$ACME_EMAIL}
+}
+
+{$SILONR_DOMAIN} {
+  encode zstd gzip
+  reverse_proxy app:3000
+}
+
+{$SILONR_FILES_DOMAIN} {
+  reverse_proxy minio:9000
+}
