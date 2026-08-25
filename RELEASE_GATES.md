@@ -78,7 +78,7 @@ Evidência: workflows `SiloNR Offline Protocol E2E` e `SiloNR Desktop Process E2
 - [ ] teste em staging com o provedor real escolhido para PostgreSQL + storage S3-compatible + HTTPS;
 - [ ] monitoramento/alerta real configurado para health checks e erros 5xx.
 
-Evidência atual: workflow `SiloNR Backup Restore Drill` e diretório `ops/`.
+Evidência atual: workflows `SiloNR Backup Restore Drill` e `SiloNR Pilot Stack`, diretório `ops/` e guia `STAGING_PILOT.md`. O pacote de implantação, monitoramento, alerta, backup externo e restore isolado está preparado; os dois itens acima permanecem abertos até execução e evidência na VPS/provedor reais.
 
 ## Gate F — Piloto real
 
