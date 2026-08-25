@@ -9,6 +9,12 @@ edition = "2021"
 name = "silonr_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+default = []
+# CI-only shim so the real Tauri/SQLite process can run under Linux WebDriver.
+# Windows release builds never enable this feature and continue to use DPAPI.
+ci-insecure-store = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
