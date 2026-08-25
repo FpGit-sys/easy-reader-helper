@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { requirePermission, resolveAccessScope } from "@/server/access";
 import { getDb, getPool } from "@/server/db/client";
@@ -244,7 +245,7 @@ describe("autenticação do computador offline", () => {
     await db
       .update(memberships)
       .set({ active: false })
-      .where(eqMembershipUser(users.inspectorA));
+      .where(eq(memberships.userId, users.inspectorA));
 
     const request = new Request("https://silonr.test/api/offline/bootstrap", {
       headers: { authorization: `Bearer ${ACTIVE_DEVICE_TOKEN}` },
@@ -254,10 +255,6 @@ describe("autenticação do computador offline", () => {
     await db
       .update(memberships)
       .set({ active: true })
-      .where(eqMembershipUser(users.inspectorA));
+      .where(eq(memberships.userId, users.inspectorA));
   });
 });
-
-function eqMembershipUser(userId: string) {
-  return memberships.userId === userId;
-}
