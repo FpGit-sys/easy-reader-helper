@@ -75,16 +75,16 @@ Evidência: workflows `SiloNR Offline Protocol E2E` e `SiloNR Desktop Process E2
 - [x] restore protegido por confirmação explícita;
 - [x] drill automatizado: schema real → backup → banco isolado → restore → verificação de sentinel e tabelas;
 - [x] procedimento de backup de object storage;
-- [ ] teste em staging com o provedor real escolhido para PostgreSQL + storage S3-compatible + HTTPS;
-- [ ] monitoramento/alerta real configurado para health checks e erros 5xx.
+- [ ] implantação piloto executada no ambiente real escolhido: VPS ou servidor local com IP fixo, HTTPS e storage privado;
+- [ ] monitoramento real agendado, backup externo e restore em ambiente isolado comprovados.
 
-Evidência atual: workflows `SiloNR Backup Restore Drill` e `SiloNR Pilot Stack`, diretório `ops/` e guia `STAGING_PILOT.md`. O pacote de implantação, monitoramento, alerta, backup externo e restore isolado está preparado; os dois itens acima permanecem abertos até execução e evidência na VPS/provedor reais.
+Evidência atual: workflows `SiloNR Backup Restore Drill`, `SiloNR Pilot Stack` e `SiloNR Local Stack`, diretório `ops/` e guias `STAGING_PILOT.md` e `LOCAL_DEPLOYMENT.md`. Há pacotes para VPS ou servidor local; os itens permanecem abertos até execução e evidência no equipamento real.
 
 ## Gate F — Piloto real
 
-- [ ] domínio HTTPS de staging/piloto;
-- [ ] PostgreSQL de piloto com backup externo habilitado;
-- [ ] bucket privado de piloto com credenciais próprias;
+- [ ] endpoint HTTPS do piloto definido: domínio público ou IP privado fixo com CA instalada nos PCs autorizados;
+- [ ] PostgreSQL do piloto com backup em disco externo/NAS habilitado;
+- [ ] storage privado do piloto com credenciais próprias;
 - [ ] organização/unidade real provisionada;
 - [ ] usuários reais e perfis revisados;
 - [ ] silos reais cadastrados;

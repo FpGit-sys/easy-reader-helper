@@ -37,7 +37,13 @@ sudo bash ./ops/local-bootstrap.sh
 
 ## Backup e restauração
 
-Crie backup ao final de cada dia e mantenha uma cópia desconectada do computador-servidor:
+Agende o monitor a cada cinco minutos e o backup ao final de cada dia. O monitor grava um estado simples no diretório de backup e retorna erro se aplicação, storage, containers ou espaço em disco não estiverem saudáveis:
+
+```bash
+bash ./ops/local-monitor.sh
+```
+
+Mantenha uma cópia de backup desconectada do computador-servidor:
 
 ```bash
 sudo bash ./ops/local-backup.sh

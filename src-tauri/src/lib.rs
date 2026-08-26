@@ -154,6 +154,29 @@ fn open_online(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
         .map_err(|error| format!("Não foi possível abrir o SiloNR online: {error}"))
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{deployment_kind, validate_server_url};
+    use url::Url;
+
+    #[test]
+    fn rejects_plain_http_on_lan() {
+        assert!(validate_server_url("http://192.168.1.50").is_err());
+    }
+
+    #[test]
+    fn accepts_https_local_server() {
+        let url = validate_server_url("https://192.168.1.50").expect("private HTTPS URL");
+        assert_eq!(deployment_kind(&url), "local");
+    }
+
+    #[test]
+    fn classifies_public_hostname_as_cloud() {
+        let url = Url::parse("https://silonr.example.com").expect("valid URL");
+        assert_eq!(deployment_kind(&url), "cloud");
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
