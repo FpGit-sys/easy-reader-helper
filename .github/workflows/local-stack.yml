@@ -81,9 +81,9 @@ jobs:
         run: |
           set -euo pipefail
           ca=deploy/local/silonr-local-ca.crt
-          curl --fail --resolve "silonr.local:443:127.0.0.1" --resolve "silonr.local:9443:127.0.0.1" --cacert "$ca" https://silonr.local/api/health/live
-          curl --fail --resolve "silonr.local:443:127.0.0.1" --resolve "silonr.local:9443:127.0.0.1" --cacert "$ca" https://silonr.local/api/health/ready
-          curl --fail --resolve "silonr.local:443:127.0.0.1" --resolve "silonr.local:9443:127.0.0.1" --cacert "$ca" https://silonr.local:9443/minio/health/live
+          curl --noproxy '*' --fail --resolve "silonr.local:443:127.0.0.1" --resolve "silonr.local:9443:127.0.0.1" --cacert "$ca" https://silonr.local/api/health/live
+          curl --noproxy '*' --fail --resolve "silonr.local:443:127.0.0.1" --resolve "silonr.local:9443:127.0.0.1" --cacert "$ca" https://silonr.local/api/health/ready
+          curl --noproxy '*' --fail --resolve "silonr.local:443:127.0.0.1" --resolve "silonr.local:9443:127.0.0.1" --cacert "$ca" https://silonr.local:9443/minio/health/live
 
       - name: Bootstrap first local administrator
         shell: bash
@@ -101,12 +101,12 @@ jobs:
         run: |
           set -euo pipefail
           ca=deploy/local/silonr-local-ca.crt
-          login_status=$(curl --silent --resolve "silonr.local:443:127.0.0.1" --cacert "$ca" --output /tmp/login.json --write-out '%{http_code}' \
+          login_status=$(curl --noproxy '*' --silent --resolve "silonr.local:443:127.0.0.1" --cacert "$ca" --output /tmp/login.json --write-out '%{http_code}' \
             --request POST https://silonr.local/api/auth/sign-in/email \
             --header 'content-type: application/json' \
             --data '{"email":"admin@silonr.local","password":"Silonr-Local-CI-Password-2026!"}')
           test "$login_status" = "200"
-          signup_status=$(curl --silent --resolve "silonr.local:443:127.0.0.1" --cacert "$ca" --output /tmp/signup.json --write-out '%{http_code}' \
+          signup_status=$(curl --noproxy '*' --silent --resolve "silonr.local:443:127.0.0.1" --cacert "$ca" --output /tmp/signup.json --write-out '%{http_code}' \
             --request POST https://silonr.local/api/auth/sign-up/email \
             --header 'content-type: application/json' \
             --data '{"name":"Intruso","email":"intruso@silonr.local","password":"Password-Not-Allowed-2026!"}')
@@ -123,7 +123,7 @@ jobs:
           LOCAL_RESTORE_CONFIRM=RESTORE_SILONR_LOCAL bash ops/local-restore.sh "$bundle"
           bash ops/local-diagnostics.sh deploy/local/.env /tmp/silonr-local-diagnostics.tar.gz
           test -s /tmp/silonr-local-diagnostics.tar.gz
-          curl --fail --resolve "silonr.local:443:127.0.0.1" --cacert deploy/local/silonr-local-ca.crt https://silonr.local/api/health/ready
+          curl --noproxy '*' --fail --resolve "silonr.local:443:127.0.0.1" --cacert deploy/local/silonr-local-ca.crt https://silonr.local/api/health/ready
 
       - name: Show logs on failure
         if: failure()
