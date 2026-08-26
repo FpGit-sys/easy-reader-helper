@@ -111,8 +111,8 @@ services:
     environment:
       SILONR_LOCAL_SERVER: ${SILONR_LOCAL_SERVER:?configure SILONR_LOCAL_SERVER}
     ports:
-      - "${SILONR_LOCAL_SERVER}:443:443"
-      - "${SILONR_LOCAL_SERVER}:9443:9443"
+      - "${SILONR_LOCAL_BIND_IP}:443:443"
+      - "${SILONR_LOCAL_BIND_IP}:9443:9443"
     volumes:
       - ./deploy/local/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

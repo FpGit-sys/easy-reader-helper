@@ -37,7 +37,8 @@ permissions:
   contents: read
 
 env:
-  SILONR_LOCAL_SERVER: 127.0.0.1
+  SILONR_LOCAL_SERVER: silonr.local
+  SILONR_LOCAL_BIND_IP: 127.0.0.1
   SILONR_LOCAL_ALLOW_LOOPBACK: "true"
   POSTGRES_DB: silonr
   POSTGRES_USER: silonr
@@ -63,7 +64,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p deploy/local
-          env | grep -E '^(SILONR_LOCAL_SERVER|POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|BETTER_AUTH_SECRET|MINIO_ROOT_USER|MINIO_ROOT_PASSWORD|S3_BUCKET|S3_ACCESS_KEY_ID|S3_SECRET_ACCESS_KEY|LOCAL_BACKUP_DIR|LOCAL_BACKUP_RETENTION_DAYS)=' > deploy/local/.env
+          env | grep -E '^(SILONR_LOCAL_SERVER|SILONR_LOCAL_BIND_IP|POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|BETTER_AUTH_SECRET|MINIO_ROOT_USER|MINIO_ROOT_PASSWORD|S3_BUCKET|S3_ACCESS_KEY_ID|S3_SECRET_ACCESS_KEY|LOCAL_BACKUP_DIR|LOCAL_BACKUP_RETENTION_DAYS)=' > deploy/local/.env
 
       - name: Validate scripts and secure Compose model
         shell: bash
@@ -80,9 +81,9 @@ jobs:
         run: |
           set -euo pipefail
           ca=deploy/local/silonr-local-ca.crt
-          curl --fail --cacert "$ca" https://127.0.0.1/api/health/live
-          curl --fail --cacert "$ca" https://127.0.0.1/api/health/ready
-          curl --fail --cacert "$ca" https://127.0.0.1:9443/minio/health/live
+          curl --fail --resolve "silonr.local:443:127.0.0.1" --resolve "silonr.local:9443:127.0.0.1" --cacert "$ca" https://silonr.local/api/health/live
+          curl --fail --resolve "silonr.local:443:127.0.0.1" --resolve "silonr.local:9443:127.0.0.1" --cacert "$ca" https://silonr.local/api/health/ready
+          curl --fail --resolve "silonr.local:443:127.0.0.1" --resolve "silonr.local:9443:127.0.0.1" --cacert "$ca" https://silonr.local:9443/minio/health/live
 
       - name: Bootstrap first local administrator
         shell: bash
@@ -100,13 +101,13 @@ jobs:
         run: |
           set -euo pipefail
           ca=deploy/local/silonr-local-ca.crt
-          login_status=$(curl --silent --cacert "$ca" --output /tmp/login.json --write-out '%{http_code}' \
-            --request POST https://127.0.0.1/api/auth/sign-in/email \
+          login_status=$(curl --silent --resolve "silonr.local:443:127.0.0.1" --cacert "$ca" --output /tmp/login.json --write-out '%{http_code}' \
+            --request POST https://silonr.local/api/auth/sign-in/email \
             --header 'content-type: application/json' \
             --data '{"email":"admin@silonr.local","password":"Silonr-Local-CI-Password-2026!"}')
           test "$login_status" = "200"
-          signup_status=$(curl --silent --cacert "$ca" --output /tmp/signup.json --write-out '%{http_code}' \
-            --request POST https://127.0.0.1/api/auth/sign-up/email \
+          signup_status=$(curl --silent --resolve "silonr.local:443:127.0.0.1" --cacert "$ca" --output /tmp/signup.json --write-out '%{http_code}' \
+            --request POST https://silonr.local/api/auth/sign-up/email \
             --header 'content-type: application/json' \
             --data '{"name":"Intruso","email":"intruso@silonr.local","password":"Password-Not-Allowed-2026!"}')
           test "$signup_status" != "200"
@@ -122,7 +123,7 @@ jobs:
           LOCAL_RESTORE_CONFIRM=RESTORE_SILONR_LOCAL bash ops/local-restore.sh "$bundle"
           bash ops/local-diagnostics.sh deploy/local/.env /tmp/silonr-local-diagnostics.tar.gz
           test -s /tmp/silonr-local-diagnostics.tar.gz
-          curl --fail --cacert deploy/local/silonr-local-ca.crt https://127.0.0.1/api/health/ready
+          curl --fail --resolve "silonr.local:443:127.0.0.1" --cacert deploy/local/silonr-local-ca.crt https://silonr.local/api/health/ready
 
       - name: Show logs on failure
         if: failure()

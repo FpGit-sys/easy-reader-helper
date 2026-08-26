@@ -19,7 +19,7 @@ ca="$repo_dir/deploy/local/silonr-local-ca.crt"
 wait_for_url() {
   local url="$1"
   for _ in $(seq 1 30); do
-    if curl --fail --silent --show-error --max-time 5 --cacert "$ca" "$url" >/dev/null; then
+    if curl --fail --silent --show-error --max-time 5 --cacert "$ca" --resolve "$SILONR_LOCAL_SERVER:443:$SILONR_LOCAL_BIND_IP" --resolve "$SILONR_LOCAL_SERVER:9443:$SILONR_LOCAL_BIND_IP" "$url" >/dev/null; then
       return 0
     fi
     sleep 1

@@ -18,7 +18,7 @@ Use um equipamento dedicado quando houver vários usuários: 4 núcleos, 8 GB de
 ## Instalação
 
 1. Copie `deploy/local/.env.example` para `deploy/local/.env`.
-2. Defina `SILONR_LOCAL_SERVER` com o IPv4 privado fixo e gere credenciais diferentes, com pelo menos 24 caracteres aleatórios.
+2. Mantenha `SILONR_LOCAL_SERVER=silonr.local`, defina `SILONR_LOCAL_BIND_IP` com o IPv4 privado fixo e gere credenciais diferentes, com pelo menos 24 caracteres aleatórios.
 3. Aponte `LOCAL_BACKUP_DIR` para disco externo/NAS e restrinja o arquivo `.env` ao administrador.
 4. Execute:
 
@@ -30,10 +30,10 @@ sudo bash ./ops/local-bootstrap.sh
 5. Em cada Windows autorizado, copie `deploy/local/silonr-local-ca.crt` e execute PowerShell como Administrador:
 
 ```powershell
-.\scripts\install-local-ca.ps1 -CertificatePath .\deploy\local\silonr-local-ca.crt
+.\scripts\install-local-ca.ps1 -CertificatePath .\deploy\local\silonr-local-ca.crt -ServerAddress 192.168.1.50
 ```
 
-6. No Desktop, informe `https://IP_FIXO`, teste a conexão e faça o pareamento. No Firewall do servidor, permita TCP 443 e 9443 somente no perfil Privado e somente para a sub-rede local.
+6. No Desktop, informe `https://silonr.local`, teste a conexão e faça o pareamento. No Firewall do servidor, permita TCP 443 e 9443 somente no perfil Privado e somente para a sub-rede local.
 
 ## Backup e restauração
 

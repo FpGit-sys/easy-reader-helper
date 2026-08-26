@@ -23,8 +23,8 @@ fail() {
 for service in postgres minio app caddy; do
   "${compose[@]}" ps --status running --services | grep -qx "$service" || fail "container $service não está em execução"
 done
-curl --fail --silent --show-error --max-time 10 --cacert "$ca" "https://$SILONR_LOCAL_SERVER/api/health/ready" >/dev/null || fail "aplicação não está pronta"
-curl --fail --silent --show-error --max-time 10 --cacert "$ca" "https://$SILONR_LOCAL_SERVER:9443/minio/health/live" >/dev/null || fail "storage não está pronto"
+curl --fail --silent --show-error --max-time 10 --cacert "$ca" --resolve "$SILONR_LOCAL_SERVER:443:$SILONR_LOCAL_BIND_IP" "https://$SILONR_LOCAL_SERVER/api/health/ready" >/dev/null || fail "aplicação não está pronta"
+curl --fail --silent --show-error --max-time 10 --cacert "$ca" --resolve "$SILONR_LOCAL_SERVER:9443:$SILONR_LOCAL_BIND_IP" "https://$SILONR_LOCAL_SERVER:9443/minio/health/live" >/dev/null || fail "storage não está pronto"
 
 used_percent="$(df -P "$LOCAL_BACKUP_DIR" | awk 'NR==2 {gsub("%","",$5); print $5}')"
 [[ "$used_percent" =~ ^[0-9]+$ ]] || fail "não foi possível medir o disco"

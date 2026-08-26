@@ -14,7 +14,7 @@ set -a
 source "$env_file"
 set +a
 
-required=(SILONR_LOCAL_SERVER POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD BETTER_AUTH_SECRET MINIO_ROOT_USER MINIO_ROOT_PASSWORD S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY LOCAL_BACKUP_DIR)
+required=(SILONR_LOCAL_SERVER SILONR_LOCAL_BIND_IP POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD BETTER_AUTH_SECRET MINIO_ROOT_USER MINIO_ROOT_PASSWORD S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY LOCAL_BACKUP_DIR)
 for key in "${required[@]}"; do
   if [[ -z "${!key:-}" ]]; then
     echo "Variável obrigatória ausente: $key" >&2
@@ -22,18 +22,23 @@ for key in "${required[@]}"; do
   fi
 done
 
-python3 - "$SILONR_LOCAL_SERVER" "${SILONR_LOCAL_ALLOW_LOOPBACK:-false}" <<'PY'
+python3 - "$SILONR_LOCAL_BIND_IP" "${SILONR_LOCAL_ALLOW_LOOPBACK:-false}" <<'PY'
 import ipaddress
 import sys
 address = ipaddress.ip_address(sys.argv[1])
 allow_loopback = sys.argv[2].lower() == "true"
 if address.version != 4:
-    raise SystemExit("SILONR_LOCAL_SERVER deve ser IPv4")
+    raise SystemExit("SILONR_LOCAL_BIND_IP deve ser IPv4")
 if address.is_loopback and allow_loopback:
     raise SystemExit(0)
 if not address.is_private or address.is_loopback or address.is_link_local:
-    raise SystemExit("SILONR_LOCAL_SERVER deve ser um IPv4 privado fixo da LAN")
+    raise SystemExit("SILONR_LOCAL_BIND_IP deve ser um IPv4 privado fixo da LAN")
 PY
+
+if [[ ! "$SILONR_LOCAL_SERVER" =~ ^[a-z0-9-]+\.local$ ]]; then
+  echo "SILONR_LOCAL_SERVER deve ser um nome local simples terminado em .local." >&2
+  exit 1
+fi
 
 if [[ "$LOCAL_BACKUP_DIR" != /* ]]; then
   echo "LOCAL_BACKUP_DIR deve ser um caminho absoluto." >&2
@@ -83,4 +88,4 @@ for name in ("app", "migrate"):
         raise SystemExit("DEPLOYMENT_MODE deve ser local")
 PY
 
-echo "Preflight local aprovado para https://$SILONR_LOCAL_SERVER"
+echo "Preflight local aprovado para https://$SILONR_LOCAL_SERVER ($SILONR_LOCAL_BIND_IP)"
