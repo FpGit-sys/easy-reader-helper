@@ -71,3 +71,7 @@ Revise o arquivo antes de enviá-lo. O pacote inclui estado dos containers, vers
 Antes de qualquer atualização, faça backup e guarde o instalador/commit anterior. Atualize primeiro uma cópia de teste, execute migrations e valide login, inspeção, evidência, sincronização e dossiê. Nunca apague o diretório de dados do Desktop durante a troca do instalador.
 
 A migração para VPS ou serviço gerenciado reutiliza o mesmo pacote: restaure o `database.dump` em PostgreSQL, copie `objects/` para o bucket privado, configure os novos endpoints HTTPS e só então altere o endereço nos Desktops. IDs, auditoria, rascunhos e evidências permanecem preservados; a migração deve ser ensaiada e validada antes do corte.
+
+## Licença mensal
+
+Depois que a instalação local estiver saudável, configure a ativação mensal seguindo [`LICENSING.md`](LICENSING.md). O Supabase/Asaas recebe apenas metadados de licença e pagamento; dados operacionais continuam nesta stack local.

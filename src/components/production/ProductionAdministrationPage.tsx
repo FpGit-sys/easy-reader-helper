@@ -43,6 +43,7 @@ import {
   updateProductionMember,
   updateProductionOrganization,
 } from "@/server/operations/admin.functions";
+import { activateProductionLicense, refreshProductionLicense } from "@/server/licensing/functions";
 import { can, type Role } from "@/server/rbac";
 
 type AdminData = Awaited<ReturnType<typeof getProductionAdministration>>;
@@ -112,7 +113,7 @@ export function ProductionAdministrationPage() {
         subtitle={`${data.organization.name} · implantação, usuários, unidades e segurança da conta`}
       />
 
-      <LicenseSummary data={data} />
+      <LicenseSummary data={data} onChanged={refresh} />
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[1fr_1.3fr]">
         <OrganizationCard data={data} onChanged={refresh} />
@@ -199,18 +200,80 @@ export function ProductionAdministrationPage() {
   );
 }
 
-function LicenseSummary({ data }: { data: AdminData }) {
+function LicenseSummary({ data, onChanged }: { data: AdminData; onChanged: () => Promise<void> }) {
   const license = data.license;
+  const [licenseKey, setLicenseKey] = useState("");
+  const activation = useMutation({
+    mutationFn: () => activateProductionLicense({ data: { organizationId: data.organization.id, licenseKey } }),
+    onSuccess: async () => {
+      setLicenseKey("");
+      toast.success("Licença ativada e validada.");
+      await onChanged();
+    },
+    onError: (error) => toast.error(licenseError(error)),
+  });
+  const refresh = useMutation({
+    mutationFn: () => refreshProductionLicense({ data: { organizationId: data.organization.id } }),
+    onSuccess: async () => {
+      toast.success("Renovação verificada.");
+      await onChanged();
+    },
+    onError: (error) => toast.error(licenseError(error)),
+  });
+
   return (
-    <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <Metric icon={<ShieldCheck className="size-4" />} label="Licença" value={license ? `${license.plan} · ${licenseStatus(license.status)}` : "Não configurada"} />
-      <Metric icon={<Building2 className="size-4" />} label="Unidades" value={license ? `${data.usage.activeFacilities} / ${license.maxFacilities}` : String(data.usage.activeFacilities)} />
-      <Metric icon={<Users className="size-4" />} label="Usuários ativos" value={license ? `${data.usage.activeUsers} / ${license.maxUsers}` : String(data.usage.activeUsers)} />
-      <Metric icon={<KeyRound className="size-4" />} label="Validade" value={license?.validUntil ? formatDate(license.validUntil) : "Sem data definida"} />
-    </section>
+    <>
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric icon={<ShieldCheck className="size-4" />} label="Licença" value={license ? `${license.plan} · ${licenseStatus(license.status)}` : "Não configurada"} />
+        <Metric icon={<Building2 className="size-4" />} label="Unidades" value={license ? `${data.usage.activeFacilities} / ${license.maxFacilities}` : String(data.usage.activeFacilities)} />
+        <Metric icon={<Users className="size-4" />} label="Usuários ativos" value={license ? `${data.usage.activeUsers} / ${license.maxUsers}` : String(data.usage.activeUsers)} />
+        <Metric icon={<KeyRound className="size-4" />} label="Mensalidade válida até" value={license?.subscriptionValidUntil ? formatDate(license.subscriptionValidUntil) : license?.validUntil ? formatDate(license.validUntil) : "Sem data definida"} />
+      </section>
+
+      <section className="mt-5 rounded border border-border bg-card p-4">
+        <div className="flex items-center gap-2"><KeyRound className="size-4" /><h2 className="font-semibold">Licença mensal</h2></div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          A chave é enviada pelo servidor local ao serviço de licenças e nunca é armazenada em texto legível.
+        </p>
+        {license?.readOnly ? (
+          <div className="mt-3 rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            Ambiente em somente leitura: {licenseReason(license.readOnlyReason)}. Consulta, exportação e backup continuam disponíveis.
+          </div>
+        ) : null}
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <Input
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={licenseKey}
+            onChange={(event) => setLicenseKey(event.target.value)}
+            placeholder="SLNR-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
+            maxLength={80}
+          />
+          <Button disabled={activation.isPending || licenseKey.trim().length < 20} onClick={() => activation.mutate()}>
+            {activation.isPending ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+            Ativar licença
+          </Button>
+          <Button variant="outline" disabled={!license?.managed || refresh.isPending} onClick={() => refresh.mutate()}>
+            {refresh.isPending ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+            Verificar renovação
+          </Button>
+        </div>
+        {license?.managed ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Última verificação: {license.lastCheckedAt ? formatDateTime(license.lastCheckedAt) : "ainda não realizada"} ·
+            carência até {license.graceUntil ? formatDateTime(license.graceUntil) : "—"}.
+            {license.lastError ? " A última consulta online falhou; a concessão assinada em cache continua valendo até o prazo exibido." : ""}
+          </p>
+        ) : (
+          <p className="mt-3 text-xs text-muted-foreground">
+            O período de teste local continua válido até a ativação de uma licença mensal.
+          </p>
+        )}
+      </section>
+    </>
   );
 }
-
 function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return <div className="rounded border border-border bg-card p-4"><div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">{icon}{label}</div><p className="mt-2 text-lg font-semibold">{value}</p></div>;
 }
@@ -391,8 +454,10 @@ function canAddFacility(data: AdminData) { return !data.license || data.usage.ac
 function canAddUser(data: AdminData) { return !data.license || data.usage.activeUsers < data.license.maxUsers; }
 function normalizeRole(role: string): MemberRole { return role in ROLE_LABELS ? role as MemberRole : "leitor"; }
 function roleLabel(role: string) { return role in ROLE_LABELS ? ROLE_LABELS[role as MemberRole] : role; }
-function licenseStatus(status: string) { const labels: Record<string, string> = { trial: "Teste", active: "Ativa", suspended: "Suspensa", expired: "Expirada", cancelled: "Cancelada" }; return labels[status] ?? status; }
+function licenseStatus(status: string) { const labels: Record<string, string> = { available: "Disponível", trial: "Teste", active: "Ativa", past_due: "Pagamento pendente", suspended: "Suspensa", expired: "Expirada", cancelled: "Cancelada" }; return labels[status] ?? status; }
+function licenseReason(reason: string | null) { const labels: Record<string, string> = { LICENSE_EXPIRED: "mensalidade e carência expiradas", LICENSE_NOT_ACTIVE: "licença suspensa ou cancelada", LICENSE_CLOCK_ROLLBACK: "relógio do servidor incompatível", LICENSE_NOT_CONFIGURED: "licença não configurada" }; return reason ? labels[reason] ?? reason : "licença indisponível"; }
 function formatDate(value: string) { return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(new Date(value)); }
+function formatDateTime(value: string) { return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)); }
 function Th({ children }: { children: React.ReactNode }) { return <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{children}</th>; }
 function Td({ children }: { children: React.ReactNode }) { return <td className="px-3 py-2 text-sm">{children}</td>; }
 function Loading({ text }: { text: string }) { return <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />{text}</div>; }
@@ -408,6 +473,8 @@ function adminError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   if (message.includes("LICENSE_USER_LIMIT_REACHED")) return "O limite de usuários da licença foi atingido.";
   if (message.includes("LICENSE_FACILITY_LIMIT_REACHED")) return "O limite de unidades da licença foi atingido.";
+  if (message.includes("LICENSE_EXPIRED")) return "A licença e o período de carência expiraram. Renove o pagamento e tente novamente.";
+  if (message.includes("LICENSE_NOT_ACTIVE")) return "A licença ainda não está ativa no checkout ou foi suspensa.";
   if (message.includes("USER_ACCOUNT_ALREADY_ASSIGNED")) return "Já existe uma conta SiloNR vinculada a outro ambiente com este e-mail. Use outro e-mail ou trate a vinculação com o suporte.";
   if (message.includes("ROLE_REQUIRES_FACILITY")) return "Este perfil precisa ser vinculado a uma unidade específica.";
   if (message.includes("ADMIN_ROLE_MUST_BE_ORGANIZATION_WIDE")) return "Administrador da empresa deve ter escopo de todas as unidades.";
@@ -417,4 +484,15 @@ function adminError(error: unknown) {
   if (message.includes("LAST_FACILITY_REQUIRED")) return "A empresa precisa manter ao menos uma unidade ativa.";
   if (message.includes("INVALID_FACILITY_SCOPE")) return "A unidade escolhida não pertence a esta empresa ou está desativada.";
   return "Não foi possível concluir a operação administrativa.";
+}
+
+function licenseError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("LICENSE_KEY_INVALID")) return "Chave inválida. Confira todos os grupos de letras e números.";
+  if (message.includes("LICENSE_NOT_ACTIVE")) return "O pagamento desta licença ainda não foi confirmado ou ela está suspensa.";
+  if (message.includes("LICENSE_EXPIRED")) return "A licença está expirada. Regularize o pagamento antes de ativar.";
+  if (message.includes("INSTALLATION_LIMIT_REACHED")) return "O limite de instalações desta licença foi atingido.";
+  if (message.includes("LICENSE_SERVICE_NOT_CONFIGURED")) return "O serviço de licenças ainda não foi configurado neste servidor.";
+  if (message.includes("LICENSE_SERVICE")) return "Não foi possível consultar o serviço de licenças agora.";
+  return "Não foi possível validar a licença.";
 }

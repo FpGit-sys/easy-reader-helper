@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getDb } from "@/server/db/client";
 import { devices } from "@/server/db/schema.extensions";
 import { validateRequestContentLength } from "@/server/files/policy";
+import { assertLicenseAllowsMutation } from "@/server/licensing/local";
 import {
   deviceErrorStatus,
   OFFLINE_SYNC_PROTOCOL_VERSION,
@@ -31,6 +32,7 @@ export const Route = createFileRoute("/api/offline/sync")({
 
           const ctx = await requireDevice(request, "inspections.execute");
           deviceId = ctx.deviceId;
+          await assertLicenseAllowsMutation(ctx.organizationId);
           const parsed = syncRequestSchema.safeParse(await request.json());
           if (!parsed.success) return json({ error: "INVALID_SYNC_PAYLOAD", issues: parsed.error.issues }, 400);
 

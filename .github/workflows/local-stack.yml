@@ -12,6 +12,9 @@ on:
       - "scripts/install-local-ca.ps1"
       - "ops/local-*.sh"
       - "src/server/env.ts"
+      - "src/server/licensing/**"
+      - "supabase/**"
+      - "LICENSING.md"
       - "src-tauri/**"
       - "desktop/**"
       - ".github/workflows/local-stack.yml"
@@ -25,6 +28,9 @@ on:
       - "scripts/install-local-ca.ps1"
       - "ops/local-*.sh"
       - "src/server/env.ts"
+      - "src/server/licensing/**"
+      - "supabase/**"
+      - "LICENSING.md"
       - "src-tauri/**"
       - "desktop/**"
       - ".github/workflows/local-stack.yml"
@@ -49,6 +55,11 @@ env:
   S3_BUCKET: silonr-evidence
   S3_ACCESS_KEY_ID: silonr-local-app
   S3_SECRET_ACCESS_KEY: ci-local-minio-app-secret-2026
+  LICENSE_SERVICE_URL: https://ci-placeholder.supabase.co/functions/v1
+  LICENSE_SERVICE_KEY: ci-placeholder-anon-key
+  LICENSE_SIGNING_PUBLIC_KEY: ci-placeholder-public-key
+  LICENSE_INSTALLATION_ENCRYPTION_KEY: Y2ktbG9jYWwtbGljZW5zZS1rZXktMzItYnl0ZXMhISE=
+  LICENSE_REFRESH_INTERVAL_HOURS: 24
   LOCAL_BACKUP_DIR: /tmp/silonr-local-backups
   LOCAL_BACKUP_RETENTION_DAYS: 30
 
@@ -64,7 +75,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p deploy/local
-          env | grep -E '^(SILONR_LOCAL_SERVER|SILONR_LOCAL_BIND_IP|POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|BETTER_AUTH_SECRET|MINIO_ROOT_USER|MINIO_ROOT_PASSWORD|S3_BUCKET|S3_ACCESS_KEY_ID|S3_SECRET_ACCESS_KEY|LOCAL_BACKUP_DIR|LOCAL_BACKUP_RETENTION_DAYS)=' > deploy/local/.env
+          env | grep -E '^(SILONR_LOCAL_SERVER|SILONR_LOCAL_BIND_IP|POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|BETTER_AUTH_SECRET|MINIO_ROOT_USER|MINIO_ROOT_PASSWORD|S3_BUCKET|S3_ACCESS_KEY_ID|S3_SECRET_ACCESS_KEY|LICENSE_SERVICE_URL|LICENSE_SERVICE_KEY|LICENSE_SIGNING_PUBLIC_KEY|LICENSE_INSTALLATION_ENCRYPTION_KEY|LICENSE_REFRESH_INTERVAL_HOURS|LOCAL_BACKUP_DIR|LOCAL_BACKUP_RETENTION_DAYS)=' > deploy/local/.env
 
       - name: Validate scripts and secure Compose model
         shell: bash

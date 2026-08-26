@@ -24,6 +24,7 @@ dist-ssr
 *.key
 *.pfx
 *.p12
+license-keys-*.csv
 
 # Local deployment outputs
 deploy/local/silonr-local-ca.crt

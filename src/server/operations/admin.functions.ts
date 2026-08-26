@@ -7,6 +7,7 @@ import { getAuth } from "@/server/auth";
 import { getDb, getPool } from "@/server/db/client";
 import { facilities, memberships, organizations } from "@/server/db/schema";
 import { licenses } from "@/server/db/schema.extensions";
+import { getLocalLicenseState } from "@/server/licensing/local";
 import { requireSessionUser } from "@/server/session";
 
 const organizationScopeSchema = z.object({ organizationId: z.string().uuid() });
@@ -19,9 +20,9 @@ const archiveFacilitySchema = organizationScopeSchema.extend({ facilityId: z.str
 const createMemberSchema = organizationScopeSchema.extend({ name: z.string().trim().min(2).max(160), email: z.string().email().max(320).transform((value) => value.toLowerCase()), temporaryPassword: z.string().min(12).max(128), role: memberRoleSchema, facilityId: z.string().uuid().nullable() });
 const updateMemberSchema = organizationScopeSchema.extend({ membershipId: z.string().uuid(), role: memberRoleSchema, facilityId: z.string().uuid().nullable(), active: z.boolean() });
 
-async function authorizeCompanyAdministration(organizationId: string) {
+async function authorizeCompanyAdministration(organizationId: string, licenseMutation = false) {
   const session = await requireSessionUser();
-  const scope = await requirePermission({ userId: session.user.id, organizationId, facilityId: null, permission: "users.manage" });
+  const scope = await requirePermission({ userId: session.user.id, organizationId, facilityId: null, permission: "users.manage", licenseMutation });
   return { session, scope };
 }
 
@@ -70,7 +71,7 @@ export const getProductionAdministration = createServerFn({ method: "GET" }).val
     db.select({ id: organizations.id, name: organizations.name, legalName: organizations.legalName, document: organizations.document, active: organizations.active }).from(organizations).where(eq(organizations.id, data.organizationId)).limit(1),
     db.select({ id: facilities.id, name: facilities.name, city: facilities.city, state: facilities.state, active: facilities.active }).from(facilities).where(eq(facilities.organizationId, data.organizationId)).orderBy(desc(facilities.active), asc(facilities.name)),
     db.select({ id: memberships.id, userId: memberships.userId, role: memberships.role, facilityId: memberships.facilityId, active: memberships.active, createdAt: memberships.createdAt }).from(memberships).where(eq(memberships.organizationId, data.organizationId)).orderBy(desc(memberships.active), asc(memberships.createdAt)),
-    getCurrentLicense(data.organizationId),
+    getLocalLicenseState(data.organizationId),
   ]);
   if (!organization) throw new Error("NOT_FOUND:ORGANIZATION");
   const userIds = [...new Set(membershipRows.map((row) => row.userId))];
@@ -84,13 +85,13 @@ export const getProductionAdministration = createServerFn({ method: "GET" }).val
       const user = usersById.get(member.userId);
       return { id: member.id, userId: member.userId, name: user?.name?.trim() || "Usuário", email: user?.email ?? "", emailVerified: user?.emailVerified ?? false, authRole: user?.role ?? "user", role: member.role, facilityId: member.facilityId, facilityName: member.facilityId ? facilitiesById.get(member.facilityId)?.name ?? "Unidade" : null, active: member.active, createdAt: member.createdAt.toISOString(), isCurrentUser: member.userId === session.user.id };
     }),
-    license: license ? { plan: license.plan, status: license.status, validFrom: license.validFrom.toISOString(), validUntil: license.validUntil?.toISOString() ?? null, maxFacilities: license.maxFacilities, maxUsers: license.maxUsers, offlineGraceDays: license.offlineGraceDays } : null,
+    license,
     usage: { activeFacilities: facilityRows.filter((facility) => facility.active).length, activeUsers: new Set(membershipRows.filter((row) => row.active).map((row) => row.userId)).size },
   };
 });
 
 export const updateProductionOrganization = createServerFn({ method: "POST" }).validator(updateOrganizationSchema).handler(async ({ data }) => {
-  const { session } = await authorizeCompanyAdministration(data.organizationId);
+  const { session } = await authorizeCompanyAdministration(data.organizationId, true);
   const db = getDb();
   const [before] = await db.select().from(organizations).where(eq(organizations.id, data.organizationId)).limit(1);
   if (!before) throw new Error("NOT_FOUND:ORGANIZATION");
@@ -101,7 +102,7 @@ export const updateProductionOrganization = createServerFn({ method: "POST" }).v
 });
 
 export const createProductionFacility = createServerFn({ method: "POST" }).validator(createFacilitySchema).handler(async ({ data }) => {
-  const { session } = await authorizeCompanyAdministration(data.organizationId);
+  const { session } = await authorizeCompanyAdministration(data.organizationId, true);
   await assertFacilityLimit(data.organizationId);
   const [created] = await getDb().insert(facilities).values({ organizationId: data.organizationId, name: data.facility.name, city: data.facility.city || null, state: data.facility.state || null }).returning();
   if (!created) throw new Error("FACILITY_CREATE_FAILED");
@@ -110,7 +111,7 @@ export const createProductionFacility = createServerFn({ method: "POST" }).valid
 });
 
 export const updateProductionFacility = createServerFn({ method: "POST" }).validator(updateFacilitySchema).handler(async ({ data }) => {
-  const { session } = await authorizeCompanyAdministration(data.organizationId);
+  const { session } = await authorizeCompanyAdministration(data.organizationId, true);
   const db = getDb();
   const [before] = await db.select().from(facilities).where(and(eq(facilities.id, data.facilityId), eq(facilities.organizationId, data.organizationId))).limit(1);
   if (!before) throw new Error("NOT_FOUND:FACILITY");
@@ -121,7 +122,7 @@ export const updateProductionFacility = createServerFn({ method: "POST" }).valid
 });
 
 export const archiveProductionFacility = createServerFn({ method: "POST" }).validator(archiveFacilitySchema).handler(async ({ data }) => {
-  const { session } = await authorizeCompanyAdministration(data.organizationId);
+  const { session } = await authorizeCompanyAdministration(data.organizationId, true);
   const db = getDb();
   const activeFacilities = await db.select({ id: facilities.id }).from(facilities).where(and(eq(facilities.organizationId, data.organizationId), eq(facilities.active, true)));
   if (activeFacilities.length <= 1) throw new Error("LAST_FACILITY_REQUIRED");
@@ -135,7 +136,7 @@ export const archiveProductionFacility = createServerFn({ method: "POST" }).vali
 });
 
 export const createProductionMember = createServerFn({ method: "POST" }).validator(createMemberSchema).handler(async ({ data }) => {
-  const { session } = await authorizeCompanyAdministration(data.organizationId);
+  const { session } = await authorizeCompanyAdministration(data.organizationId, true);
   validateRoleScope(data.role, data.facilityId);
   await assertFacilityBelongsToOrganization(data.organizationId, data.facilityId);
   const pool = getPool();
@@ -161,7 +162,7 @@ export const createProductionMember = createServerFn({ method: "POST" }).validat
 });
 
 export const updateProductionMember = createServerFn({ method: "POST" }).validator(updateMemberSchema).handler(async ({ data }) => {
-  const { session, scope } = await authorizeCompanyAdministration(data.organizationId);
+  const { session, scope } = await authorizeCompanyAdministration(data.organizationId, true);
   validateRoleScope(data.role, data.facilityId);
   await assertFacilityBelongsToOrganization(data.organizationId, data.facilityId);
   const db = getDb();
