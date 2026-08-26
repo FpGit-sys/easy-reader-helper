@@ -78,7 +78,7 @@ No painel Asaas, configure o webhook como:
 
 - URL: `https://SEU_PROJECT_REF.supabase.co/functions/v1/asaas-webhook`
 - Cabeçalho/token: o mesmo `ASAAS_WEBHOOK_TOKEN` salvo nos secrets
-- Eventos mínimos: `PAYMENT_RECEIVED`, `PAYMENT_CONFIRMED`, `PAYMENT_OVERDUE`, `PAYMENT_REFUNDED`, `PAYMENT_CHARGEBACK_REQUESTED`, `PAYMENT_CHARGEBACK_DISPUTE` e `PAYMENT_DELETED`
+- Eventos mínimos: `PAYMENT_RECEIVED`, `PAYMENT_CONFIRMED`, `PAYMENT_OVERDUE`, `PAYMENT_REFUNDED`, `PAYMENT_CHARGEBACK_REQUESTED` e `PAYMENT_CHARGEBACK_DISPUTE`
 
 ### Servidor local de cada cliente
 

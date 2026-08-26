@@ -22,6 +22,18 @@ interface AsaasPayment {
   status?: string;
 }
 
+function paymentStatusMatchesEvent(event: string, status: string | undefined): boolean {
+  const expected: Record<string, string[]> = {
+    PAYMENT_RECEIVED: ["RECEIVED", "RECEIVED_IN_CASH"],
+    PAYMENT_CONFIRMED: ["CONFIRMED", "RECEIVED", "RECEIVED_IN_CASH"],
+    PAYMENT_OVERDUE: ["OVERDUE"],
+    PAYMENT_REFUNDED: ["REFUNDED", "REFUND_IN_PROGRESS"],
+    PAYMENT_CHARGEBACK_REQUESTED: ["CHARGEBACK_REQUESTED"],
+    PAYMENT_CHARGEBACK_DISPUTE: ["CHARGEBACK_DISPUTE", "AWAITING_CHARGEBACK_REVERSAL"],
+  };
+  return !expected[event] || expected[event].includes(status ?? "");
+}
+
 Deno.serve(async (request) => {
   try {
     if (request.method !== "POST") throw new Error("METHOD_NOT_ALLOWED");
@@ -42,6 +54,9 @@ Deno.serve(async (request) => {
     const payment = await paymentResponse.json().catch(() => null) as AsaasPayment | null;
     if (!paymentResponse.ok || payment?.id !== event.payment.id) {
       throw new Error("ASAAS_PAYMENT_VERIFICATION_FAILED");
+    }
+    if (!paymentStatusMatchesEvent(event.event, payment.status)) {
+      throw new Error("ASAAS_PAYMENT_STATUS_MISMATCH");
     }
 
     const result = await rpc<Record<string, unknown>>("process_asaas_payment_event", {

@@ -265,7 +265,8 @@ begin
       entitlement_version = entitlement_version + 1,
       updated_at = now()
     where id = v_license.id;
-  elsif p_event_type in ('PAYMENT_REFUNDED', 'PAYMENT_CHARGEBACK_REQUESTED', 'PAYMENT_CHARGEBACK_DISPUTE', 'PAYMENT_DELETED') then
+  elsif p_event_type in ('PAYMENT_REFUNDED', 'PAYMENT_CHARGEBACK_REQUESTED', 'PAYMENT_CHARGEBACK_DISPUTE')
+    and v_license.last_payment_id = p_payment_id then
     v_next_status := 'suspended';
     update public.software_licenses set
       status = 'suspended', entitlement_version = entitlement_version + 1, updated_at = now()
