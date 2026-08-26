@@ -25,6 +25,10 @@ dist-ssr
 *.pfx
 *.p12
 
+# Local deployment outputs
+deploy/local/silonr-local-ca.crt
+silonr-local-diagnostics-*.tar.gz
+
 # Tauri / Rust build artifacts
 src-tauri/target/
 target/
