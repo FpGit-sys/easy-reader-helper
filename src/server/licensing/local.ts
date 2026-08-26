@@ -56,12 +56,12 @@ export interface LocalLicenseState {
 
 function licensingEnv() {
   const env = getServerEnv();
-  if (!env.LICENSE_SERVICE_URL || !env.LICENSE_SERVICE_KEY || !env.LICENSE_SIGNING_PUBLIC_KEY || !env.LICENSE_INSTALLATION_ENCRYPTION_KEY) {
+  if (!env.LICENSE_SERVICE_URL || !env.LICENSE_CLIENT_API_KEY || !env.LICENSE_SIGNING_PUBLIC_KEY || !env.LICENSE_INSTALLATION_ENCRYPTION_KEY) {
     throw new Error("LICENSE_SERVICE_NOT_CONFIGURED");
   }
   return {
     serviceUrl: env.LICENSE_SERVICE_URL.replace(/\/$/, ""),
-    serviceKey: env.LICENSE_SERVICE_KEY,
+    clientApiKey: env.LICENSE_CLIENT_API_KEY,
     publicKey: env.LICENSE_SIGNING_PUBLIC_KEY,
     encryptionKey: env.LICENSE_INSTALLATION_ENCRYPTION_KEY,
     refreshHours: env.LICENSE_REFRESH_INTERVAL_HOURS,
@@ -77,8 +77,7 @@ async function callService(path: string, body: Record<string, unknown>): Promise
       method: "POST",
       signal: controller.signal,
       headers: {
-        authorization: `Bearer ${env.serviceKey}`,
-        apikey: env.serviceKey,
+        "x-silonr-license-key": env.clientApiKey,
         "content-type": "application/json",
       },
       body: JSON.stringify(body),

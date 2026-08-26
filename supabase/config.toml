@@ -2,7 +2,7 @@
 verify_jwt = false
 
 [functions.license-activate]
-verify_jwt = true
+verify_jwt = false
 
 [functions.license-refresh]
-verify_jwt = true
+verify_jwt = false

@@ -48,8 +48,12 @@ Deno.serve(async (request) => {
       return json({ error: "INVALID_WEBHOOK" }, 400);
     }
 
-    const paymentResponse = await fetch(`${env("ASAAS_API_URL")}/v3/payments/${encodeURIComponent(event.payment.id)}`, {
-      headers: { access_token: env("ASAAS_API_KEY"), accept: "application/json" },
+    const paymentResponse = await fetch(`${env("ASAAS_API_URL").replace(/\/$/, "")}/payments/${encodeURIComponent(event.payment.id)}`, {
+      headers: {
+        access_token: env("ASAAS_API_KEY"),
+        accept: "application/json",
+        "user-agent": "SiloNR-Licensing/0.1",
+      },
     });
     const payment = await paymentResponse.json().catch(() => null) as AsaasPayment | null;
     if (!paymentResponse.ok || payment?.id !== event.payment.id) {

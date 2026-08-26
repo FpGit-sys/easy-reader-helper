@@ -57,14 +57,36 @@ export async function constantTimeEqual(left: string, right: string): Promise<bo
   return difference === 0;
 }
 
+export async function authorizeLicenseClient(request: Request): Promise<void> {
+  const supplied = request.headers.get("x-silonr-license-key") ?? "";
+  if (!await constantTimeEqual(supplied, env("LICENSE_CLIENT_API_KEY"))) {
+    throw new Error("LICENSE_CLIENT_UNAUTHORIZED");
+  }
+}
+
+function supabaseAdminKey(): string {
+  const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+  if (legacy) return legacy;
+  try {
+    const keys = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}") as Record<string, unknown>;
+    const current = typeof keys.default === "string" ? keys.default.trim() : "";
+    if (current) return current;
+  } catch {
+    // The configuration error below intentionally avoids logging secret material.
+  }
+  throw new Error("CONFIGURATION_MISSING:SUPABASE_ADMIN_KEY");
+}
+
 export async function rpc<T>(name: string, body: Record<string, unknown>): Promise<T> {
+  const adminKey = supabaseAdminKey();
+  const headers: Record<string, string> = {
+    apikey: adminKey,
+    "content-type": "application/json",
+  };
+  if (adminKey.split(".").length === 3) headers.authorization = `Bearer ${adminKey}`;
   const response = await fetch(`${env("SUPABASE_URL")}/rest/v1/rpc/${name}`, {
     method: "POST",
-    headers: {
-      authorization: `Bearer ${env("SUPABASE_SERVICE_ROLE_KEY")}`,
-      apikey: env("SUPABASE_SERVICE_ROLE_KEY"),
-      "content-type": "application/json",
-    },
+    headers,
     body: JSON.stringify(body),
   });
   const payload = await response.json().catch(() => null) as { message?: string } | null;

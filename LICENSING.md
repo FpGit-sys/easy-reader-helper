@@ -16,12 +16,12 @@ O SiloNR continua local: PostgreSQL, arquivos, usuários, inspeções e evidênc
 Execute a migration `supabase/migrations/20260826000000_licensing.sql` no projeto escolhido e publique:
 
 ```bash
-supabase functions deploy license-activate
-supabase functions deploy license-refresh
+supabase functions deploy license-activate --no-verify-jwt
+supabase functions deploy license-refresh --no-verify-jwt
 supabase functions deploy asaas-webhook --no-verify-jwt
 ```
 
-O webhook é a única função sem JWT do Supabase; ele exige o token exclusivo do Asaas. As funções de ativação e atualização exigem a chave pública/anon do projeto no cabeçalho `Authorization`.
+As três funções têm `verify_jwt=false` e autenticam explicitamente a chamada: o webhook exige o token exclusivo do Asaas; ativação e atualização exigem `LICENSE_CLIENT_API_KEY`. Isso funciona tanto em projetos Supabase com chaves novas quanto com chaves legadas.
 
 ## 2. Gerar as chaves criptográficas
 
@@ -55,9 +55,10 @@ Cadastre os valores de sandbox durante os testes:
 
 ```bash
 supabase secrets set \
-  ASAAS_API_URL=https://api-sandbox.asaas.com \
+  ASAAS_API_URL=https://api-sandbox.asaas.com/v3 \
   ASAAS_API_KEY='COLE_AQUI_A_CHAVE_DA_CONTA_SANDBOX_ASAAS' \
   ASAAS_WEBHOOK_TOKEN='CRIE_UM_TOKEN_EXCLUSIVO_DE_32_A_255_CARACTERES' \
+  LICENSE_CLIENT_API_KEY='GERE_UMA_CHAVE_ALEATORIA_COM_PELO_MENOS_32_CARACTERES' \
   LICENSE_SIGNING_PRIVATE_KEY='COLE_AQUI_A_CHAVE_PRIVADA_GERADA' \
   LICENSE_SIGNING_PUBLIC_KEY='COLE_AQUI_A_CHAVE_PUBLICA_GERADA' \
   LICENSE_ISSUER=silonr-license-service \
@@ -68,7 +69,7 @@ Na venda real, altere **somente estes valores do Asaas** no mesmo painel/secrets
 
 | Configuração | Teste | Produção |
 |---|---|---|
-| `ASAAS_API_URL` | `https://api-sandbox.asaas.com` | `https://api.asaas.com` |
+| `ASAAS_API_URL` | `https://api-sandbox.asaas.com/v3` | `https://api.asaas.com/v3` |
 | `ASAAS_API_KEY` | chave API da conta Sandbox | chave API da conta Asaas real |
 | `ASAAS_WEBHOOK_TOKEN` | token configurado no webhook Sandbox | novo token exclusivo do webhook de produção |
 
@@ -86,12 +87,12 @@ Copie `deploy/local/.env.example` para `deploy/local/.env` e substitua:
 
 ```dotenv
 LICENSE_SERVICE_URL=https://SEU_PROJECT_REF.supabase.co/functions/v1
-LICENSE_SERVICE_KEY=COLE_AQUI_A_CHAVE_ANON_OU_PUBLISHABLE_DO_SUPABASE
+LICENSE_CLIENT_API_KEY=COLE_AQUI_A_MESMA_CHAVE_CLIENTE_SALVA_NOS_SECRETS
 LICENSE_SIGNING_PUBLIC_KEY=COLE_AQUI_A_MESMA_CHAVE_PUBLICA_ED25519
 LICENSE_INSTALLATION_ENCRYPTION_KEY=COLE_AQUI_UMA_CHAVE_BASE64_DE_32_BYTES_EXCLUSIVA_DO_CLIENTE
 ```
 
-`LICENSE_SERVICE_KEY` é a chave **anon/publishable**, não a `service_role`. A `service_role`, a chave privada Ed25519 e a API key do Asaas nunca entram no computador do cliente.
+`LICENSE_CLIENT_API_KEY` é uma chave aleatória própria do SiloNR, não é chave `anon`, `publishable`, `secret` nem `service_role` do Supabase. As chaves administrativas do Supabase, a chave privada Ed25519 e a API key do Asaas nunca entram no computador do cliente.
 
 ## 5. Ligar uma licença ao checkout
 
@@ -115,6 +116,6 @@ Após o webhook de pagamento, confirme no Supabase que a licença está `active`
 ## Recuperação e rotação
 
 - Perda de `LICENSE_INSTALLATION_ENCRYPTION_KEY`: revogue a instalação central e ative novamente; o segredo cifrado antigo não é recuperável.
-- Vazamento da chave anon/publishable: faça rotação no Supabase e atualize `deploy/local/.env`.
+- Vazamento de `LICENSE_CLIENT_API_KEY`: gere outra, atualize os secrets das funções e depois o `deploy/local/.env` dos clientes.
 - Vazamento de `ASAAS_API_KEY` ou `ASAAS_WEBHOOK_TOKEN`: rotacione no Asaas e nos secrets imediatamente.
 - Vazamento da chave privada Ed25519: gere novo par, publique a privada, distribua a nova pública e reative cada instalação.

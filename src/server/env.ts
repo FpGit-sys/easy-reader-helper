@@ -23,7 +23,7 @@ const serverEnvSchema = z.object({
     .default("false")
     .transform((value) => value === "true"),
   LICENSE_SERVICE_URL: z.string().url().optional().or(z.literal("")),
-  LICENSE_SERVICE_KEY: z.string().optional().default(""),
+  LICENSE_CLIENT_API_KEY: z.string().optional().default(""),
   LICENSE_SIGNING_PUBLIC_KEY: z.string().optional().default(""),
   LICENSE_INSTALLATION_ENCRYPTION_KEY: z.string().optional().default(""),
   LICENSE_REFRESH_INTERVAL_HOURS: z.coerce.number().int().min(1).max(168).default(24),

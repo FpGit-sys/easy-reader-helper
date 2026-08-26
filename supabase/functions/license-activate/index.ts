@@ -1,4 +1,5 @@
 import {
+  authorizeLicenseClient,
   errorResponse,
   json,
   normalizeLicenseKey,
@@ -13,6 +14,7 @@ declare const Deno: { serve(handler: (request: Request) => Response | Promise<Re
 Deno.serve(async (request) => {
   try {
     if (request.method !== "POST") throw new Error("METHOD_NOT_ALLOWED");
+    await authorizeLicenseClient(request);
     if (!request.headers.get("content-type")?.toLowerCase().includes("application/json")) {
       return json({ error: "CONTENT_TYPE_REQUIRED" }, 415);
     }
