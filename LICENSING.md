@@ -29,12 +29,13 @@ As três funções têm `verify_jwt=false` e autenticam explicitamente a chamada
 bun run license:keys
 ```
 
-O comando imprime três valores. Copie-os imediatamente para os locais abaixo e não salve a saída no Git.
+O comando imprime quatro valores. Copie-os imediatamente para os locais abaixo e não salve a saída no Git.
 
 | Valor | Onde colocar | Segredo? |
 |---|---|---|
 | `LICENSE_SIGNING_PRIVATE_KEY` | Supabase → Edge Functions → Secrets | Sim; nunca vai ao cliente |
 | `LICENSE_SIGNING_PUBLIC_KEY` | Supabase Secrets **e** `deploy/local/.env` | Não; precisa ser idêntica nos dois lados |
+| `LICENSE_CLIENT_API_KEY` | Supabase Secrets **e** `deploy/local/.env` | Sim; autentica somente o servidor local |
 | `LICENSE_INSTALLATION_ENCRYPTION_KEY` | `deploy/local/.env` de cada instalação | Sim; use uma diferente por cliente |
 
 ## 3. Gerar as licenças
