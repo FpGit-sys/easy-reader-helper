@@ -1,0 +1,132 @@
+name: SiloNR Local Stack
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "docker-compose.local.yml"
+      - "deploy/local/**"
+      - "scripts/local-*.sh"
+      - "scripts/bootstrap-local.ts"
+      - "scripts/install-local-ca.ps1"
+      - "ops/local-*.sh"
+      - "src/server/env.ts"
+      - "src-tauri/**"
+      - "desktop/**"
+      - ".github/workflows/local-stack.yml"
+  push:
+    branches: ["production/**"]
+    paths:
+      - "docker-compose.local.yml"
+      - "deploy/local/**"
+      - "scripts/local-*.sh"
+      - "scripts/bootstrap-local.ts"
+      - "scripts/install-local-ca.ps1"
+      - "ops/local-*.sh"
+      - "src/server/env.ts"
+      - "src-tauri/**"
+      - "desktop/**"
+      - ".github/workflows/local-stack.yml"
+
+concurrency:
+  group: silonr-local-stack-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  SILONR_LOCAL_SERVER: 127.0.0.1
+  SILONR_LOCAL_ALLOW_LOOPBACK: "true"
+  POSTGRES_DB: silonr
+  POSTGRES_USER: silonr
+  POSTGRES_PASSWORD: ci-local-postgres-secret-2026
+  BETTER_AUTH_SECRET: ci-local-auth-secret-at-least-32-characters
+  MINIO_ROOT_USER: silonr-local-root
+  MINIO_ROOT_PASSWORD: ci-local-minio-root-secret-2026
+  S3_BUCKET: silonr-evidence
+  S3_ACCESS_KEY_ID: silonr-local-app
+  S3_SECRET_ACCESS_KEY: ci-local-minio-app-secret-2026
+  LOCAL_BACKUP_DIR: /tmp/silonr-local-backups
+  LOCAL_BACKUP_RETENTION_DAYS: 30
+
+jobs:
+  local-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Write CI local configuration
+        shell: bash
+        run: |
+          mkdir -p deploy/local
+          env | grep -E '^(SILONR_LOCAL_SERVER|POSTGRES_DB|POSTGRES_USER|POSTGRES_PASSWORD|BETTER_AUTH_SECRET|MINIO_ROOT_USER|MINIO_ROOT_PASSWORD|S3_BUCKET|S3_ACCESS_KEY_ID|S3_SECRET_ACCESS_KEY|LOCAL_BACKUP_DIR|LOCAL_BACKUP_RETENTION_DAYS)=' > deploy/local/.env
+
+      - name: Validate scripts and secure Compose model
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/local-preflight.sh ops/local-deploy.sh ops/local-bootstrap.sh ops/local-backup.sh ops/local-restore.sh ops/local-diagnostics.sh
+          bash scripts/local-preflight.sh
+
+      - name: Build and start local stack
+        run: bash ops/local-deploy.sh
+
+      - name: Verify TLS and local health
+        shell: bash
+        run: |
+          set -euo pipefail
+          ca=deploy/local/silonr-local-ca.crt
+          curl --fail --cacert "$ca" https://127.0.0.1/api/health/live
+          curl --fail --cacert "$ca" https://127.0.0.1/api/health/ready
+          curl --fail --cacert "$ca" https://127.0.0.1:9443/minio/health/live
+
+      - name: Bootstrap first local administrator
+        shell: bash
+        run: |
+          docker compose --env-file deploy/local/.env -f docker-compose.local.yml run --rm \
+            -e ALLOW_PUBLIC_SIGNUP=true \
+            -e SILONR_BOOTSTRAP_CONFIRM=BOOTSTRAP_SILONR_LOCAL \
+            -e SILONR_BOOTSTRAP_PASSWORD='Silonr-Local-CI-Password-2026!' \
+            migrate bun run scripts/bootstrap-local.ts \
+              --email admin@silonr.local --name 'Admin Local' \
+              --organization 'Empresa Local CI' --facility 'Unidade Local CI'
+
+      - name: Verify login and closed public signup
+        shell: bash
+        run: |
+          set -euo pipefail
+          ca=deploy/local/silonr-local-ca.crt
+          login_status=$(curl --silent --cacert "$ca" --output /tmp/login.json --write-out '%{http_code}' \
+            --request POST https://127.0.0.1/api/auth/sign-in/email \
+            --header 'content-type: application/json' \
+            --data '{"email":"admin@silonr.local","password":"Silonr-Local-CI-Password-2026!"}')
+          test "$login_status" = "200"
+          signup_status=$(curl --silent --cacert "$ca" --output /tmp/signup.json --write-out '%{http_code}' \
+            --request POST https://127.0.0.1/api/auth/sign-up/email \
+            --header 'content-type: application/json' \
+            --data '{"name":"Intruso","email":"intruso@silonr.local","password":"Password-Not-Allowed-2026!"}')
+          test "$signup_status" != "200"
+          test "$signup_status" != "201"
+
+      - name: Exercise backup restore and diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ops/local-backup.sh
+          bundle=$(find "$LOCAL_BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)
+          LOCAL_RESTORE_CONFIRM=RESTORE_SILONR_LOCAL bash ops/local-restore.sh "$bundle"
+          bash ops/local-diagnostics.sh deploy/local/.env /tmp/silonr-local-diagnostics.tar.gz
+          test -s /tmp/silonr-local-diagnostics.tar.gz
+          curl --fail --cacert deploy/local/silonr-local-ca.crt https://127.0.0.1/api/health/ready
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose --env-file deploy/local/.env -f docker-compose.local.yml logs --tail=250 || true
+
+      - name: Stop stack
+        if: always()
+        run: docker compose --env-file deploy/local/.env -f docker-compose.local.yml down -v --remove-orphans || true
