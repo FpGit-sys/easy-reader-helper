@@ -74,9 +74,12 @@ export async function rpc<T>(name: string, body: Record<string, unknown>): Promi
   return payload as T;
 }
 
-function base64ToBytes(value: string): Uint8Array {
+function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {
   const binary = atob(value.replaceAll(/\s/g, ""));
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const buffer = new ArrayBuffer(binary.length);
+  const bytes = new Uint8Array(buffer);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
 }
 
 function base64Url(value: Uint8Array | string): string {
