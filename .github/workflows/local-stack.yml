@@ -69,7 +69,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash -n scripts/local-preflight.sh ops/local-deploy.sh ops/local-bootstrap.sh ops/local-backup.sh ops/local-restore.sh ops/local-diagnostics.sh
+          bash -n scripts/local-preflight.sh ops/local-deploy.sh ops/local-bootstrap.sh ops/local-backup.sh ops/local-restore.sh ops/local-diagnostics.sh ops/local-monitor.sh
           bash scripts/local-preflight.sh
 
       - name: Build and start local stack
@@ -116,6 +116,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          bash ops/local-monitor.sh
           bash ops/local-backup.sh
           bundle=$(find "$LOCAL_BACKUP_DIR" -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)
           LOCAL_RESTORE_CONFIRM=RESTORE_SILONR_LOCAL bash ops/local-restore.sh "$bundle"
