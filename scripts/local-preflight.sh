@@ -14,7 +14,7 @@ set -a
 source "$env_file"
 set +a
 
-required=(SILONR_LOCAL_SERVER SILONR_LOCAL_BIND_IP POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD BETTER_AUTH_SECRET MINIO_ROOT_USER MINIO_ROOT_PASSWORD S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY LOCAL_BACKUP_DIR)
+required=(SILONR_LOCAL_SERVER SILONR_LOCAL_BIND_IP POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD BETTER_AUTH_SECRET MINIO_ROOT_USER MINIO_ROOT_PASSWORD S3_BUCKET S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY LICENSE_SERVICE_URL LICENSE_CLIENT_API_KEY LICENSE_SIGNING_PUBLIC_KEY LICENSE_INSTALLATION_ENCRYPTION_KEY LOCAL_BACKUP_DIR)
 for key in "${required[@]}"; do
   if [[ -z "${!key:-}" ]]; then
     echo "Variável obrigatória ausente: $key" >&2
@@ -45,7 +45,7 @@ if [[ "$LOCAL_BACKUP_DIR" != /* ]]; then
   exit 1
 fi
 
-secrets=(POSTGRES_PASSWORD BETTER_AUTH_SECRET MINIO_ROOT_PASSWORD S3_SECRET_ACCESS_KEY)
+secrets=(POSTGRES_PASSWORD BETTER_AUTH_SECRET MINIO_ROOT_PASSWORD S3_SECRET_ACCESS_KEY LICENSE_CLIENT_API_KEY LICENSE_INSTALLATION_ENCRYPTION_KEY)
 for key in "${secrets[@]}"; do
   value="${!key}"
   if (( ${#value} < 24 )) || [[ "$value" == *replace-* ]]; then
@@ -55,6 +55,10 @@ for key in "${secrets[@]}"; do
 done
 if [[ "$POSTGRES_PASSWORD" == "$MINIO_ROOT_PASSWORD" || "$POSTGRES_PASSWORD" == "$S3_SECRET_ACCESS_KEY" || "$MINIO_ROOT_PASSWORD" == "$S3_SECRET_ACCESS_KEY" ]]; then
   echo "As senhas de banco, MinIO e aplicação devem ser diferentes." >&2
+  exit 1
+fi
+if [[ ! "$LICENSE_SERVICE_URL" =~ ^https://[^/]+/functions/v1/?$ ]]; then
+  echo "LICENSE_SERVICE_URL deve usar HTTPS e terminar em /functions/v1." >&2
   exit 1
 fi
 if [[ "$MINIO_ROOT_USER" == "$S3_ACCESS_KEY_ID" ]]; then

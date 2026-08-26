@@ -1,0 +1,60 @@
+name: SiloNR Licensing
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - "src/server/licensing/**"
+      - "src/tests/licensing.test.ts"
+      - "scripts/generate-license-*.ts"
+      - ".github/workflows/licensing.yml"
+  push:
+    branches: ["production/**", "feature/licensing-**"]
+    paths:
+      - "supabase/**"
+      - "src/server/licensing/**"
+      - "src/tests/licensing.test.ts"
+      - "scripts/generate-license-*.ts"
+      - ".github/workflows/licensing.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  central-license:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: licensing_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d licensing_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v5
+      - name: Create Supabase database roles
+        run: >-
+          psql -h 127.0.0.1 -U postgres -d licensing_test -v ON_ERROR_STOP=1
+          -c "create role anon; create role authenticated; create role service_role;"
+      - name: Apply central licensing migration
+        run: psql -h 127.0.0.1 -U postgres -d licensing_test -f supabase/migrations/20260826000000_licensing.sql
+      - name: Exercise activation, refresh and webhook idempotence
+        run: psql -h 127.0.0.1 -U postgres -d licensing_test -f supabase/tests/licensing.sql
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Type-check Edge Functions
+        run: deno check supabase/functions/license-activate/index.ts supabase/functions/license-refresh/index.ts supabase/functions/asaas-webhook/index.ts

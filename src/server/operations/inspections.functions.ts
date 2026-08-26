@@ -76,13 +76,14 @@ type ChecklistSnapshot = z.infer<typeof checklistSnapshotSchema>;
 
 type InspectionPermission = "inspections.read" | "inspections.execute";
 
-async function authorize(data: z.infer<typeof scopeSchema>, permission: InspectionPermission) {
+async function authorize(data: z.infer<typeof scopeSchema>, permission: InspectionPermission, licenseMutation = false) {
   const session = await requireSessionUser();
   await requirePermission({
     userId: session.user.id,
     organizationId: data.organizationId,
     facilityId: data.facilityId,
     permission,
+    licenseMutation,
   });
   return session;
 }
@@ -314,7 +315,7 @@ export const getProductionInspection = createServerFn({ method: "GET" })
 export const createProductionInspection = createServerFn({ method: "POST" })
   .validator(createInspectionSchema)
   .handler(async ({ data }) => {
-    const session = await authorize(data, "inspections.execute");
+    const session = await authorize(data, "inspections.execute", true);
     await validateSilo(data.organizationId, data.facilityId, data.siloId);
     const db = getDb();
     const inspectionId = crypto.randomUUID();
@@ -427,7 +428,7 @@ export const createProductionInspection = createServerFn({ method: "POST" })
 export const saveProductionInspectionAnswers = createServerFn({ method: "POST" })
   .validator(saveInspectionAnswersSchema)
   .handler(async ({ data }) => {
-    const session = await authorize(data, "inspections.execute");
+    const session = await authorize(data, "inspections.execute", true);
     const db = getDb();
 
     return db.transaction(async (tx) => {
@@ -536,7 +537,7 @@ export const saveProductionInspectionAnswers = createServerFn({ method: "POST" }
 export const finalizeProductionInspection = createServerFn({ method: "POST" })
   .validator(inspectionIdSchema)
   .handler(async ({ data }) => {
-    const session = await authorize(data, "inspections.execute");
+    const session = await authorize(data, "inspections.execute", true);
     const db = getDb();
 
     return db.transaction(async (tx) => {
