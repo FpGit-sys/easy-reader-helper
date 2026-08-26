@@ -325,6 +325,7 @@ export async function assertLicenseAllowsMutation(organizationId: string): Promi
       rows = await readRows(organizationId);
     }
   }
+  if (!rows.license) throw new Error("LICENSE_NOT_CONFIGURED");
   const state = stateFromRows(rows.license, rows.lease, new Date());
   if (state.readOnly) throw new Error(state.readOnlyReason ?? "LICENSE_READ_ONLY");
 }
