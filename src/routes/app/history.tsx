@@ -10,11 +10,13 @@ import {
 } from "@/components/ui/select";
 import { Disclaimer, EmptyState, PageHeader } from "@/components/layout/PageHeader";
 import { TableWrap, Td, Th, Tr } from "@/components/tables/primitives";
+import { ProductionHistoryPage } from "@/components/production/ProductionHistoryPage";
 import { DISCLAIMER, fmtDateTime } from "@/lib/formatting";
+import { DEMO_MODE_ENABLED } from "@/lib/runtime-mode";
 import { useAppState } from "@/lib/storage/store";
 
 export const Route = createFileRoute("/app/history")({
-  component: HistoryPage,
+  component: HistoryRoutePage,
   head: () => ({
     meta: [
       { title: "Histórico — SiloNR" },
@@ -28,7 +30,11 @@ export const Route = createFileRoute("/app/history")({
   }),
 });
 
-function HistoryPage() {
+function HistoryRoutePage() {
+  return DEMO_MODE_ENABLED ? <DemoHistoryPage /> : <ProductionHistoryPage />;
+}
+
+function DemoHistoryPage() {
   const audit = useAppState((s) => s.audit);
   const [busca, setBusca] = useState("");
   const [objeto, setObjeto] = useState("todos");

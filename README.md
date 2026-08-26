@@ -1,98 +1,164 @@
 # SiloNR
 
-Software B2B de organização, inspeção, evidências, pendências, documentos e preparação para
-auditorias em unidades armazenadoras e silos.
+Software B2B para organização de documentos, inspeções, evidências, não conformidades, ações corretivas e preparação para auditorias em unidades armazenadoras e silos.
 
-> **Ambiente demonstrativo — dados e critérios fictícios.**
+> O SiloNR é ferramenta de apoio à gestão e à prontidão interna. Não afirma conformidade legal automática, não emite laudo, parecer ou certificação e não substitui responsável técnico, profissional de segurança, consultoria jurídica, auditoria ou fiscalização oficial.
 
-## O que é
+## Estado do projeto
 
-O SiloNR reúne em um só lugar o que normalmente fica espalhado entre planilhas, pastas, fotos e
-mensagens. Ele responde perguntas como: o que está pendente, quais documentos venceram, quais
-evidências faltam, quais ações corretivas estão atrasadas, qual silo concentra mais risco e como
-montar rapidamente um dossiê rastreável.
+Este repositório contém dois modos deliberadamente separados:
 
-## O que NÃO é
+- **Demonstração** (`VITE_ENABLE_DEMO=true`): dados fictícios e persistência local, usada somente para apresentação e validação de UX.
+- **Produção** (`VITE_ENABLE_DEMO=false`, padrão): autenticação, PostgreSQL, isolamento multiempresa/multiunidade, RBAC no servidor, storage privado e trilha de auditoria.
 
-O SiloNR **não** afirma conformidade legal, não emite laudo, parecer ou certificação e **não
-substitui** responsável técnico, profissional de segurança, consultoria jurídica, auditoria ou
-fiscalização oficial. Ele trabalha com "prontidão", "status documental", "pendência identificada",
-"evidência ausente" e "critério cadastrado pela organização".
+A branch `production/silonr-v1` é a linha de engenharia do produto comercial e ainda deve ser tratada como pré-piloto enquanto a PR correspondente estiver em draft.
 
-## Como executar
+## Stack de produção
+
+- React 19 + TypeScript
+- TanStack Start / TanStack Router / TanStack Query
+- Tailwind CSS + componentes Radix/shadcn
+- PostgreSQL
+- Drizzle ORM / Drizzle Kit
+- Better Auth
+- storage S3-compatible (AWS S3, Cloudflare R2, MinIO ou equivalente privado)
+- jsPDF para dossiês
+- Vitest para testes unitários e de integração
+- Tauri 2 para o cliente Windows
+- GitHub Actions para quality gate e build dos instaladores
+
+## Domínios já persistidos no servidor
+
+- organizações e unidades;
+- memberships, papéis e escopos;
+- silos;
+- requisitos, versões, fontes e vínculos por silo;
+- estado operacional dos requisitos;
+- documentos e versões;
+- inspeções e snapshots imutáveis do checklist;
+- evidências;
+- não conformidades;
+- ações corretivas;
+- eventos de auditoria;
+- licenças e dispositivos.
+
+## Segurança
+
+O servidor valida autorização por usuário + organização + unidade + papel antes das operações protegidas. Arquivos ficam privados e são baixados por autorização temporária. Uploads possuem limite de tamanho, allowlist de formatos, verificação de assinatura real dos bytes e SHA-256.
+
+O CI possui um banco PostgreSQL descartável com duas organizações e testa regressões de isolamento entre tenants. Há também smoke HTTP autenticado para confirmar sessão, acesso protegido, bloqueio cross-tenant e rejeição de arquivo executável disfarçado de PDF.
+
+Mais detalhes em [SECURITY.md](./SECURITY.md).
+
+## Ambientes
+
+Copie `.env.example` para um arquivo de ambiente local seguro e substitua todos os valores de desenvolvimento. Nunca versione secrets reais.
+
+Variáveis essenciais de produção incluem:
+
+```text
+NODE_ENV=production
+APP_URL=https://seu-dominio
+DATABASE_URL=postgresql://...
+BETTER_AUTH_URL=https://seu-dominio
+BETTER_AUTH_SECRET=<segredo forte e exclusivo>
+ALLOW_PUBLIC_SIGNUP=false
+VITE_ENABLE_DEMO=false
+```
+
+Para arquivos privados, configure as variáveis `S3_*` documentadas em `.env.example`.
+
+## Banco de dados
+
+Aplicação:
 
 ```sh
-npm i
-npm run dev     # ambiente de desenvolvimento
-npm run build   # build de produção
-npm run test    # testes (Vitest)
+bun run db:generate
+bun run db:migrate
 ```
 
-## Arquitetura
+Better Auth usa a mesma instância PostgreSQL, mas mantém suas próprias tabelas. A migração é executada pela versão instalada da biblioteca, sem depender de um CLI `latest` externo:
 
-```
-src/
-  components/   layout, tables, compliance, ui (shadcn)
-  routes/       rotas (TanStack Router): /, /demo, /app/*
-  lib/
-    rules/          motor de regras determinístico
-    calculations/   derivações para a UI
-    reports/        geração do dossiê em PDF
-    storage/        estado reativo + persistência local + mutations
-    formatting/     datas, rótulos e disclaimers
-  data/demo/    gerador do ambiente demonstrativo
-  types/        tipos de domínio
-  tests/        testes das regras e dos dados demo
+```sh
+bun run auth:migrate
 ```
 
-Rotas principais: `/` (landing), `/demo` (entrada demonstrativa) e `/app/dashboard`, `/app/silos`,
-`/app/requirements`, `/app/documents`, `/app/inspections`, `/app/nonconformities`, `/app/actions`,
-`/app/evidence`, `/app/dossier`, `/app/history`, `/app/field`, `/app/settings`.
+Para desenvolvimento local também existe `bun run db:push`; ele não substitui migrations revisadas em uma implantação comercial.
 
-## Bibliotecas
+## Primeiro tenant
 
-React, TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Router/Start, Recharts, Lucide React,
-react-hook-form, Zod, date-fns, jsPDF, jspdf-autotable, sonner, Vitest.
+O cadastro público fica fechado por padrão. Depois de criar o primeiro usuário administrativo no Better Auth, o tenant pode ser provisionado com:
 
-## Dados demo
+```sh
+bun run tenant:provision -- \
+  --email admin@cliente.com.br \
+  --organization "Cliente Agro" \
+  --facility "Unidade Rio Verde" \
+  --city "Rio Verde" \
+  --state "GO"
+```
 
-Unidade Armazenadora Santa Rita (fictícia), 5 silos, 52 critérios internos (37 atendidos, 11
-pendentes, 4 críticos), documentos vencidos e vencendo, inspeções, pendências e ações. Detalhes em
-[DEMO_DATA.md](./DEMO_DATA.md).
+Esse comando cria organização, unidade, membership administrativa, licença inicial e evento de auditoria. Não armazena a senha do administrador.
+
+## Desenvolvimento e quality gate
+
+```sh
+bun install
+bun run dev
+bun run routes:generate
+bun run typecheck
+bun run lint
+bun run test
+bun run build
+```
+
+Testes de integração com banco real exigem `DATABASE_URL` apontando para um banco de teste:
+
+```sh
+bun run test:integration
+```
+
+No GitHub Actions, o quality gate executa automaticamente geração de rotas, TypeScript, lint, testes, validação de migrations e build. Outro job sobe PostgreSQL descartável para validar isolamento multiempresa e os smokes HTTP de segurança.
+
+## Windows / Tauri
+
+A base desktop usa Tauri 2. O workflow Windows já é capaz de produzir instaladores nos formatos:
+
+- NSIS `.exe`
+- WiX `.msi`
+
+Build local, em ambiente Windows preparado:
+
+```sh
+bun run desktop:build
+```
+
+Builds internos podem ser não assinados. Para distribuição comercial ampla, o instalador deverá receber assinatura de código confiável e política de atualização segura.
+
+## Demonstração
+
+O modo demonstrativo continua disponível exclusivamente para apresentação. Ele usa dados fictícios — por exemplo a Unidade Armazenadora Santa Rita — e não deve ser confundido com uma instalação de cliente.
+
+Ative-o explicitamente apenas em ambiente de demonstração:
+
+```text
+VITE_ENABLE_DEMO=true
+```
+
+Em produção, mantenha `VITE_ENABLE_DEMO=false`.
 
 ## Índice de prontidão
 
-`itens atendidos / itens aplicáveis × 100`. Itens não aplicáveis saem do denominador e não há
-ponderação por criticidade. Na demonstração: 37 / 52 = 71,15% → exibido como **71%**. O drawer
-"Como este índice é calculado?" explica o cálculo dentro do app.
-
-## Motor de regras
-
-Funções puras, sem IA, documentadas em [RULES.md](./RULES.md): índice de prontidão, vencimento de
-documentos, evidência obrigatória ausente, ação corretiva atrasada, inspeção fora da periodicidade
-interna, requisito crítico e sugestão determinística de prioridade.
-
-## Persistência
-
-Tudo é gravado no armazenamento local do navegador. Arquivos e fotos permanecem locais e nada é
-enviado a servidores, APIs externas ou backends.
-
-## Como resetar
-
-Botão **Restaurar demonstração**, disponível no banner de todas as páginas internas e em
-Configurações.
+O índice simples segue a fórmula `itens atendidos / itens aplicáveis × 100`. Itens não aplicáveis saem do denominador. O indicador representa prontidão interna segundo os critérios cadastrados e não certificação legal.
 
 ## Fontes normativas
 
-Nenhuma regra legal entra em produção sem fonte verificada. Ver
-[LEGAL_SOURCES.md](./LEGAL_SOURCES.md).
+Nenhuma regra deve ser apresentada como fonte externa verificada sem metadados rastreáveis e validação apropriada. Ver [LEGAL_SOURCES.md](./LEGAL_SOURCES.md).
 
-## Disclaimer
+## Documentos adicionais
 
-O SiloNR é uma ferramenta de apoio à gestão de documentos, inspeções, evidências e ações internas.
-O software não substitui responsável técnico, profissional de segurança, consultoria jurídica,
-auditoria ou fiscalização oficial.
-
-## Roadmap
-
-Ver [ROADMAP.md](./ROADMAP.md).
+- [SECURITY.md](./SECURITY.md) — modelo de segurança e hardening
+- [RULES.md](./RULES.md) — regras determinísticas
+- [LEGAL_SOURCES.md](./LEGAL_SOURCES.md) — política de fontes
+- [ROADMAP.md](./ROADMAP.md) — evolução do produto
+- [DEMO_DATA.md](./DEMO_DATA.md) — cenário exclusivamente demonstrativo

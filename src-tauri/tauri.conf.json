@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "SiloNR",
+  "version": "0.1.0",
+  "identifier": "br.com.silonr.desktop",
+  "build": {
+    "frontendDist": "../desktop"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "SiloNR",
+        "width": 1360,
+        "height": 860,
+        "minWidth": 1024,
+        "minHeight": 680,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "useHttpsScheme": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Business",
+    "shortDescription": "Gestão de prontidão, inspeções e evidências para unidades armazenadoras",
+    "longDescription": "Cliente desktop do SiloNR para acesso controlado ao ambiente operacional de unidades armazenadoras.",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

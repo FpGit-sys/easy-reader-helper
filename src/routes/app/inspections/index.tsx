@@ -1,13 +1,15 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { ProductionInspectionsPage } from "@/components/production/ProductionInspectionsPage";
 import { Button } from "@/components/ui/button";
 import { Disclaimer, EmptyState, PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/layout/StatusBadge";
 import { TableWrap, Td, Th, Tr } from "@/components/tables/primitives";
 import { DISCLAIMER, fmtDate } from "@/lib/formatting";
+import { DEMO_MODE_ENABLED } from "@/lib/runtime-mode";
 import { useAppState } from "@/lib/storage/store";
 
 export const Route = createFileRoute("/app/inspections/")({
-  component: InspectionsPage,
+  component: InspectionsRoute,
   head: () => ({
     meta: [
       { title: "Inspeções — SiloNR" },
@@ -21,7 +23,11 @@ export const Route = createFileRoute("/app/inspections/")({
   }),
 });
 
-function InspectionsPage() {
+function InspectionsRoute() {
+  return DEMO_MODE_ENABLED ? <DemoInspectionsPage /> : <ProductionInspectionsPage />;
+}
+
+function DemoInspectionsPage() {
   const state = useAppState((s) => s);
 
   return (
@@ -62,21 +68,21 @@ function InspectionsPage() {
             </tr>
           </thead>
           <tbody>
-            {state.inspections.map((i) => (
-              <Tr key={i.id}>
-                <Td className="font-medium">{i.codigo}</Td>
-                <Td>{fmtDate(i.data)}</Td>
-                <Td>{state.silos.find((s) => s.id === i.siloId)?.nome ?? "—"}</Td>
-                <Td>{i.tipo}</Td>
-                <Td>{i.responsavel}</Td>
-                <Td>{i.itens.length}</Td>
-                <Td>{i.pendenciasGeradas.length}</Td>
+            {state.inspections.map((inspection) => (
+              <Tr key={inspection.id}>
+                <Td className="font-medium">{inspection.codigo}</Td>
+                <Td>{fmtDate(inspection.data)}</Td>
+                <Td>{state.silos.find((silo) => silo.id === inspection.siloId)?.nome ?? "—"}</Td>
+                <Td>{inspection.tipo}</Td>
+                <Td>{inspection.responsavel}</Td>
+                <Td>{inspection.itens.length}</Td>
+                <Td>{inspection.pendenciasGeradas.length}</Td>
                 <Td>
-                  <StatusBadge status={i.status} />
+                  <StatusBadge status={inspection.status} />
                 </Td>
                 <Td>
                   <Button asChild size="sm" variant="outline">
-                    <Link to="/app/inspections/$inspectionId" params={{ inspectionId: i.id }}>
+                    <Link to="/app/inspections/$inspectionId" params={{ inspectionId: inspection.id }}>
                       Ver
                     </Link>
                   </Button>

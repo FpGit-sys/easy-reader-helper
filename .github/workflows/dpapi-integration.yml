@@ -1,0 +1,97 @@
+name: SiloNR DPAPI Security
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src-tauri/src/secure_store.rs"
+      - "src-tauri/src/offline_v2.rs"
+      - "src-tauri/src/lib.rs"
+      - "src-tauri/Cargo.toml"
+      - "src-tauri/icons/app-icon.svg"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/dpapi-integration.yml"
+  push:
+    branches:
+      - "production/**"
+    paths:
+      - "src-tauri/src/secure_store.rs"
+      - "src-tauri/src/offline_v2.rs"
+      - "src-tauri/src/lib.rs"
+      - "src-tauri/Cargo.toml"
+      - "src-tauri/icons/app-icon.svg"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/dpapi-integration.yml"
+
+concurrency:
+  group: silonr-dpapi-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  dpapi-windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install JavaScript dependencies
+        run: bun install
+
+      - name: Generate Tauri resource icons
+        run: bun run tauri icon src-tauri/icons/app-icon.svg
+
+      - name: Verify protected token source invariant
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $lib = Get-Content "src-tauri/src/lib.rs" -Raw
+          $offline = Get-Content "src-tauri/src/offline_v2.rs" -Raw
+
+          if ($lib -notmatch 'mod secure_store;') {
+            throw "secure_store is not wired into the desktop library"
+          }
+          if ($offline -notmatch 'const DEVICE_TOKEN_PREFIX: &str = "dpapi:v1:";') {
+            throw "DPAPI token format marker is missing"
+          }
+          if ($offline -notmatch 'store_device_token\(&conn, &activation\.token\)') {
+            throw "Pairing is not storing the device token through secure storage"
+          }
+          if ($offline -match 'get_meta\(&conn,\s*"device_token"\)') {
+            throw "Direct plaintext device token read remains"
+          }
+          if ($offline -match 'set_meta\(&conn,\s*"device_token"') {
+            throw "Direct plaintext device token write remains"
+          }
+          $secureReads = [regex]::Matches($offline, 'require_device_token\(&conn\)')
+          if ($secureReads.Count -lt 2) {
+            throw "Bootstrap and synchronization are not both using protected token reads"
+          }
+
+      - name: Run Windows DPAPI tests
+        shell: pwsh
+        run: cargo test --manifest-path src-tauri/Cargo.toml secure_store --lib -- --nocapture
+
+      - name: Compile desktop library
+        shell: pwsh
+        run: cargo check --manifest-path src-tauri/Cargo.toml

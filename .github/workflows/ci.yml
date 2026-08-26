@@ -1,0 +1,243 @@
+name: SiloNR CI
+
+on:
+  push:
+    branches:
+      - main
+      - production/**
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: silonr-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Generate route tree
+        run: bun run routes:generate
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Tests
+        run: bun run test
+
+      - name: Validate database migrations can be generated
+        env:
+          DATABASE_URL: postgresql://silonr:silonr@127.0.0.1:5432/silonr
+        run: bun run db:generate
+
+      - name: Build
+        run: bun run build
+
+  tenant-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: silonr
+          POSTGRES_PASSWORD: silonr
+          POSTGRES_DB: silonr_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U silonr -d silonr_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      APP_URL: http://127.0.0.1:3000
+      DATABASE_URL: postgresql://silonr:silonr@127.0.0.1:5432/silonr_test
+      BETTER_AUTH_URL: http://127.0.0.1:3000
+      BETTER_AUTH_SECRET: integration-only-secret-at-least-32-characters
+      ALLOW_PUBLIC_SIGNUP: "false"
+      VITE_ENABLE_DEMO: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Create application test schema
+        run: bunx drizzle-kit push --force
+
+      - name: Cross-tenant integration tests
+        run: bun run test:integration
+
+      - name: Create authentication test schema
+        run: bun run auth:migrate
+
+      - name: Seed authenticated security scenario
+        run: bun run scripts/ci-http-seed.ts
+
+      - name: HTTP security E2E
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run dev -- --host 127.0.0.1 > /tmp/silonr-vite.log 2>&1 &
+          APP_PID=$!
+          trap 'kill "$APP_PID" >/dev/null 2>&1 || true' EXIT
+
+          ready=0
+          for _ in $(seq 1 40); do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/login >/tmp/silonr-login.html; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            echo "SiloNR did not become ready"
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          curl --silent --show-error --dump-header /tmp/silonr-headers.txt --output /dev/null http://127.0.0.1:3000/login
+          grep -Eqi '^x-content-type-options:[[:space:]]*nosniff' /tmp/silonr-headers.txt
+          grep -Eqi '^x-frame-options:[[:space:]]*DENY' /tmp/silonr-headers.txt
+          grep -Eqi '^referrer-policy:[[:space:]]*no-referrer' /tmp/silonr-headers.txt
+
+          unauth_upload_status=$(curl --silent --show-error --output /tmp/silonr-unauth-upload.json --write-out '%{http_code}' --request POST http://127.0.0.1:3000/api/documents/upload)
+          if [ "$unauth_upload_status" != "401" ]; then
+            echo "Expected unauthenticated document upload to return 401, got $unauth_upload_status"
+            cat /tmp/silonr-unauth-upload.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          sign_in_status=$(curl --silent --show-error --cookie-jar /tmp/silonr-cookies.txt --output /tmp/silonr-signin.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/auth/sign-in/email \
+            --header 'content-type: application/json' \
+            --data '{"email":"ci-admin@silonr.test","password":"Silonr-CI-Password-2026!","rememberMe":false}')
+          if [ "$sign_in_status" != "200" ]; then
+            echo "Expected sign-in to return 200, got $sign_in_status"
+            cat /tmp/silonr-signin.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          app_status=$(curl --silent --show-error --cookie /tmp/silonr-cookies.txt --output /tmp/silonr-overview.html --write-out '%{http_code}' http://127.0.0.1:3000/app/overview)
+          if [ "$app_status" != "200" ]; then
+            echo "Expected authenticated app route to return 200, got $app_status"
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          activation_status=$(curl --silent --show-error --output /tmp/silonr-activation.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/offline/activate \
+            --header 'content-type: application/json' \
+            --data '{"code":"CI2026-ACTIVE-OFFLINE","fingerprint":"ci-installation-fingerprint-00000001","name":"CI Windows Desktop","platform":"windows","appVersion":"0.1.0"}')
+          if [ "$activation_status" != "201" ]; then
+            echo "Expected desktop activation to return 201, got $activation_status"
+            cat /tmp/silonr-activation.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          device_token=$(bun -e 'const value = JSON.parse(await Bun.file("/tmp/silonr-activation.json").text()); if (!value.token) process.exit(1); process.stdout.write(value.token)')
+          bootstrap_status=$(curl --silent --show-error --output /tmp/silonr-bootstrap.json --write-out '%{http_code}' \
+            --header "authorization: Bearer $device_token" \
+            http://127.0.0.1:3000/api/offline/bootstrap)
+          if [ "$bootstrap_status" != "200" ]; then
+            echo "Expected paired desktop bootstrap to return 200, got $bootstrap_status"
+            cat /tmp/silonr-bootstrap.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+          grep -q '"protocolVersion":1' /tmp/silonr-bootstrap.json
+          grep -q '"organizationId":"30000000-0000-4000-8000-000000000001"' /tmp/silonr-bootstrap.json
+          grep -q '"facilityId":"40000000-0000-4000-8000-000000000001"' /tmp/silonr-bootstrap.json
+
+          reused_pairing_status=$(curl --silent --show-error --output /tmp/silonr-reused-pairing.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/offline/activate \
+            --header 'content-type: application/json' \
+            --data '{"code":"CI2026-ACTIVE-OFFLINE","fingerprint":"ci-installation-fingerprint-00000002","name":"Second Desktop","platform":"windows","appVersion":"0.1.0"}')
+          if [ "$reused_pairing_status" != "401" ]; then
+            echo "Expected one-time pairing code reuse to return 401, got $reused_pairing_status"
+            cat /tmp/silonr-reused-pairing.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          invalid_device_status=$(curl --silent --show-error --output /tmp/silonr-invalid-device.json --write-out '%{http_code}' \
+            --header 'authorization: Bearer slnr_invalid_device_token' \
+            http://127.0.0.1:3000/api/offline/bootstrap)
+          if [ "$invalid_device_status" != "401" ]; then
+            echo "Expected invalid device bearer to return 401, got $invalid_device_status"
+            cat /tmp/silonr-invalid-device.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          cross_site_status=$(curl --silent --show-error --cookie /tmp/silonr-cookies.txt --output /tmp/silonr-cross-site.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/documents/upload \
+            --header 'origin: https://attacker.invalid')
+          if [ "$cross_site_status" != "403" ]; then
+            echo "Expected cross-site mutation to return 403, got $cross_site_status"
+            cat /tmp/silonr-cross-site.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          printf '%%PDF-1.7\n1 0 obj\n' > /tmp/valid.pdf
+          cross_tenant_status=$(curl --silent --show-error --cookie /tmp/silonr-cookies.txt --output /tmp/silonr-cross-tenant.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/documents/upload \
+            --form 'organizationId=30000000-0000-4000-8000-000000000002' \
+            --form 'facilityId=40000000-0000-4000-8000-000000000002' \
+            --form 'name=Documento intruso' \
+            --form 'category=Teste' \
+            --form 'file=@/tmp/valid.pdf;type=application/pdf;filename=teste.pdf')
+          if [ "$cross_tenant_status" != "403" ]; then
+            echo "Expected cross-tenant upload to return 403, got $cross_tenant_status"
+            cat /tmp/silonr-cross-tenant.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+
+          printf '\x4d\x5a\x90\x00\x03\x00\x00\x00' > /tmp/disguised.exe
+          disguised_status=$(curl --silent --show-error --cookie /tmp/silonr-cookies.txt --output /tmp/silonr-disguised.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/documents/upload \
+            --form 'organizationId=30000000-0000-4000-8000-000000000001' \
+            --form 'facilityId=40000000-0000-4000-8000-000000000001' \
+            --form 'name=Arquivo disfarçado' \
+            --form 'category=Teste' \
+            --form 'file=@/tmp/disguised.exe;type=application/pdf;filename=laudo.pdf')
+          if [ "$disguised_status" != "400" ]; then
+            echo "Expected disguised executable to return 400, got $disguised_status"
+            cat /tmp/silonr-disguised.json || true
+            cat /tmp/silonr-vite.log
+            exit 1
+          fi
+          grep -q 'FILE_CONTENT_MISMATCH' /tmp/silonr-disguised.json

@@ -1,0 +1,174 @@
+name: SiloNR Pilot Stack
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-compose.pilot.yml"
+      - "deploy/pilot/**"
+      - "scripts/pilot-preflight.sh"
+      - "ops/pilot-*.sh"
+      - "ops/install-pilot-systemd.sh"
+      - "src/server/env.ts"
+      - "src/server/files/storage.ts"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/pilot-stack.yml"
+  push:
+    branches:
+      - "production/**"
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "docker-compose.pilot.yml"
+      - "deploy/pilot/**"
+      - "scripts/pilot-preflight.sh"
+      - "ops/pilot-*.sh"
+      - "ops/install-pilot-systemd.sh"
+      - "src/server/env.ts"
+      - "src/server/files/storage.ts"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/pilot-stack.yml"
+
+concurrency:
+  group: silonr-pilot-stack-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  SILONR_DOMAIN: silonr.invalid
+  SILONR_FILES_DOMAIN: files.silonr.invalid
+  ACME_EMAIL: ci@silonr.invalid
+  POSTGRES_DB: silonr
+  POSTGRES_USER: silonr
+  POSTGRES_PASSWORD: ci-postgres-secret-2026-not-production
+  BETTER_AUTH_SECRET: ci-pilot-stack-secret-at-least-32-characters
+  MINIO_ROOT_USER: silonr-ci-storage-root
+  MINIO_ROOT_PASSWORD: ci-minio-root-secret-2026-not-production
+  S3_ACCESS_KEY_ID: silonr-ci-app
+  S3_SECRET_ACCESS_KEY: ci-minio-app-secret-2026-not-production
+  S3_BUCKET: silonr-private
+  PILOT_ALERT_WEBHOOK_URL: https://alerts.silonr.invalid/hooks/ci
+  PILOT_BACKUP_DIR: /tmp/silonr-pilot-backups
+  PILOT_BACKUP_S3_ENDPOINT: https://backup.silonr.invalid
+  PILOT_BACKUP_S3_ACCESS_KEY_ID: silonr-ci-backup
+  PILOT_BACKUP_S3_SECRET_ACCESS_KEY: ci-external-backup-secret-2026-not-production
+  PILOT_BACKUP_S3_BUCKET: silonr-ci-backup-external
+  PILOT_BACKUP_PREFIX: ci
+  SILONR_PREFLIGHT_ALLOW_TEST_VALUES: "true"
+
+jobs:
+  container-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Validate operations shell scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/pilot-preflight.sh
+          bash -n ops/pilot-deploy.sh
+          bash -n ops/pilot-monitor.sh
+          bash -n ops/pilot-backup.sh
+          bash -n ops/pilot-restore-drill.sh
+          bash -n ops/install-pilot-systemd.sh
+
+      - name: Create CI compose override
+        shell: bash
+        run: |
+          cat > /tmp/silonr-ci-override.yml <<'YAML'
+          services:
+            minio:
+              ports:
+                - "127.0.0.1:9000:9000"
+            app:
+              ports:
+                - "127.0.0.1:3000:3000"
+              environment:
+                APP_URL: http://127.0.0.1:3000
+                BETTER_AUTH_URL: http://127.0.0.1:3000
+                S3_PUBLIC_ENDPOINT: http://127.0.0.1:9000
+            migrate:
+              environment:
+                APP_URL: http://127.0.0.1:3000
+                BETTER_AUTH_URL: http://127.0.0.1:3000
+                S3_PUBLIC_ENDPOINT: http://127.0.0.1:9000
+            caddy:
+              profiles:
+                - public-edge
+          YAML
+
+      - name: Validate real pilot deployment preflight
+        shell: bash
+        env:
+          # Preflight must inspect the real, unexposed compose model. The CI override
+          # intentionally publishes loopback ports for the smoke steps below.
+          SILONR_COMPOSE_OVERRIDE: ""
+        run: bash scripts/pilot-preflight.sh
+
+      - name: Validate Compose model with CI loopback override
+        run: docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml config --quiet
+
+      - name: Build migration and runtime images
+        run: docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml build migrate app
+
+      - name: Start database, private storage, migrations and app
+        run: docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml up -d --wait postgres minio create-bucket migrate app
+
+      - name: Verify application uses bucket-scoped S3 identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_access_key="$(docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml exec -T app printenv S3_ACCESS_KEY_ID)"
+          test "$app_access_key" = "$S3_ACCESS_KEY_ID"
+          test "$app_access_key" != "$MINIO_ROOT_USER"
+          docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml run --rm --no-deps \
+            --entrypoint /bin/sh create-bucket -c \
+            'mc alias set verify http://minio:9000 "$S3_ACCESS_KEY_ID" "$S3_SECRET_ACCESS_KEY" >/dev/null && mc stat "verify/$S3_BUCKET" >/dev/null'
+
+      - name: Verify production runtime health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/api/health/ready >/tmp/ready.json; then
+              cat /tmp/ready.json
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml ps
+          docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml logs --tail=200 app migrate postgres minio create-bucket
+          exit 1
+
+      - name: Verify public signup remains closed in production image
+        shell: bash
+        run: |
+          status=$(curl --silent --show-error --output /tmp/signup.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/auth/sign-up/email \
+            --header 'content-type: application/json' \
+            --data '{"name":"Intruso CI","email":"intruso@silonr.invalid","password":"Password-Should-Not-Register-2026!"}')
+          if [ "$status" = "200" ] || [ "$status" = "201" ]; then
+            echo "Public signup unexpectedly succeeded"
+            cat /tmp/signup.json
+            exit 1
+          fi
+          echo "Public signup blocked with HTTP $status"
+
+      - name: Show stack logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml logs --tail=250 || true
+
+      - name: Stop stack
+        if: always()
+        run: docker compose -f docker-compose.pilot.yml -f /tmp/silonr-ci-override.yml down -v --remove-orphans || true

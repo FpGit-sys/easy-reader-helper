@@ -13,14 +13,16 @@ import {
 import { Disclaimer, EmptyState, PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/layout/StatusBadge";
 import { TableWrap, Td, Th, Tr } from "@/components/tables/primitives";
+import { ProductionActionsPage } from "@/components/production/ProductionActionsPage";
 import { actionsWithStatus } from "@/lib/calculations/derive";
 import { DISCLAIMER, fmtDate } from "@/lib/formatting";
+import { DEMO_MODE_ENABLED } from "@/lib/runtime-mode";
 import { completeAction, createAction, reopenAction, updateAction } from "@/lib/storage/mutations";
 import { useAppState } from "@/lib/storage/store";
 import type { ActionStatus, Criticidade } from "@/types";
 
 export const Route = createFileRoute("/app/actions")({
-  component: ActionsPage,
+  component: ActionsRoutePage,
   head: () => ({
     meta: [
       { title: "Ações corretivas — SiloNR" },
@@ -34,7 +36,11 @@ export const Route = createFileRoute("/app/actions")({
   }),
 });
 
-function ActionsPage() {
+function ActionsRoutePage() {
+  return DEMO_MODE_ENABLED ? <DemoActionsPage /> : <ProductionActionsPage />;
+}
+
+function DemoActionsPage() {
   const state = useAppState((s) => s);
   const [filtro, setFiltro] = useState("todas");
   const [novo, setNovo] = useState({ titulo: "", responsavel: "", prazo: "", prioridade: "media" });

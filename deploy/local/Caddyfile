@@ -1,0 +1,21 @@
+{
+	auto_https disable_redirects
+}
+
+https://{$SILONR_LOCAL_SERVER} {
+	tls internal
+	log {
+		output stdout
+		format json
+	}
+	reverse_proxy app:3000
+}
+
+https://{$SILONR_LOCAL_SERVER}:9443 {
+	tls internal
+	log {
+		output stdout
+		format json
+	}
+	reverse_proxy minio:9000
+}

@@ -1,47 +1,64 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+import { NewRequirementForm } from "@/components/compliance/NewRequirementForm";
+import { Disclaimer, PageHeader } from "@/components/layout/PageHeader";
+import { DesktopOfflineSetupCard } from "@/components/production/DesktopOfflineSetupCard";
+import { ProductionAdministrationPage } from "@/components/production/ProductionAdministrationPage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Disclaimer, PageHeader } from "@/components/layout/PageHeader";
-import { NewRequirementForm } from "@/components/compliance/NewRequirementForm";
-
 import { DISCLAIMER } from "@/lib/formatting";
+import { DEMO_MODE_ENABLED } from "@/lib/runtime-mode";
 import { getState, resetDemo, setState, useAppState } from "@/lib/storage/store";
 
 export const Route = createFileRoute("/app/settings")({
-  component: SettingsPage,
+  component: SettingsRoute,
   head: () => ({
     meta: [
       { title: "Configurações — SiloNR" },
       {
         name: "description",
-        content: "Dados da unidade, responsáveis, janela de vencimento e reinício da demonstração.",
+        content:
+          "Segurança da conta, administração da empresa e ativação do SiloNR Desktop para operação offline.",
       },
       { property: "og:title", content: "Configurações — SiloNR" },
-      { property: "og:description", content: "Parâmetros internos do ambiente demonstrativo." },
+      {
+        property: "og:description",
+        content: "Conta, administração e dispositivos offline do ambiente SiloNR.",
+      },
     ],
   }),
 });
 
-function SettingsPage() {
-  const settings = useAppState((s) => s.settings);
+function SettingsRoute() {
+  return DEMO_MODE_ENABLED ? (
+    <DemoSettingsPage />
+  ) : (
+    <div className="space-y-5 pb-8">
+      <ProductionAdministrationPage />
+      <DesktopOfflineSetupCard />
+    </div>
+  );
+}
+
+function DemoSettingsPage() {
+  const settings = useAppState((state) => state.settings);
   const [form, setForm] = useState(settings);
   const [novoResp, setNovoResp] = useState("");
 
   function save() {
-    setState((s) => ({ ...s, settings: { ...s.settings, ...form } }));
+    setState((state) => ({ ...state, settings: { ...state.settings, ...form } }));
     toast.success("Configurações salvas.");
   }
 
   function exportJson() {
     const blob = new Blob([JSON.stringify(getState(), null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "silonr-dados.json";
-    a.click();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "silonr-dados.json";
+    anchor.click();
     URL.revokeObjectURL(url);
   }
 
@@ -60,7 +77,9 @@ function SettingsPage() {
             <Input
               id="unidade"
               value={form.unidadeNome}
-              onChange={(e) => setForm((f) => ({ ...f, unidadeNome: e.target.value }))}
+              onChange={(event) =>
+                setForm((value) => ({ ...value, unidadeNome: event.target.value }))
+              }
             />
           </div>
           <div className="space-y-1.5">
@@ -68,7 +87,9 @@ function SettingsPage() {
             <Input
               id="local"
               value={form.unidadeLocal}
-              onChange={(e) => setForm((f) => ({ ...f, unidadeLocal: e.target.value }))}
+              onChange={(event) =>
+                setForm((value) => ({ ...value, unidadeLocal: event.target.value }))
+              }
             />
           </div>
           <div className="space-y-1.5">
@@ -78,8 +99,11 @@ function SettingsPage() {
               type="number"
               min={1}
               value={form.janelaVencimentoDias}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, janelaVencimentoDias: Number(e.target.value) || 1 }))
+              onChange={(event) =>
+                setForm((value) => ({
+                  ...value,
+                  janelaVencimentoDias: Number(event.target.value) || 1,
+                }))
               }
             />
           </div>
@@ -90,19 +114,21 @@ function SettingsPage() {
       <section className="mt-5 space-y-3 rounded border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Responsáveis</h2>
         <ul className="flex flex-wrap gap-2">
-          {form.responsaveis.map((r) => (
+          {form.responsaveis.map((responsavel) => (
             <li
-              key={r}
+              key={responsavel}
               className="flex items-center gap-2 rounded border border-border px-2 py-1 text-sm"
             >
-              {r}
+              {responsavel}
               <button
                 type="button"
                 className="text-xs text-destructive"
                 onClick={() =>
-                  setForm((f) => ({ ...f, responsaveis: f.responsaveis.filter((x) => x !== r) }))
+                  setForm((value) => ({
+                    ...value,
+                    responsaveis: value.responsaveis.filter((item) => item !== responsavel),
+                  }))
                 }
-                aria-label={`Remover ${r}`}
               >
                 remover
               </button>
@@ -112,16 +138,18 @@ function SettingsPage() {
         <div className="flex gap-2">
           <Input
             value={novoResp}
-            onChange={(e) => setNovoResp(e.target.value)}
+            onChange={(event) => setNovoResp(event.target.value)}
             placeholder="Nome do responsável"
-            aria-label="Novo responsável"
           />
           <Button
             variant="outline"
             onClick={() => {
               const nome = novoResp.trim();
               if (!nome) return;
-              setForm((f) => ({ ...f, responsaveis: [...f.responsaveis, nome] }));
+              setForm((value) => ({
+                ...value,
+                responsaveis: [...value.responsaveis, nome],
+              }));
               setNovoResp("");
             }}
           >
@@ -139,12 +167,10 @@ function SettingsPage() {
         <NewRequirementForm responsaveis={form.responsaveis} />
       </section>
 
-
-
       <section className="mt-5 space-y-3 rounded border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Dados</h2>
         <p className="text-sm text-muted-foreground">
-          Todos os dados ficam apenas neste navegador. Nenhuma informação é enviada para servidores.
+          Todos os dados desta demonstração ficam apenas neste navegador.
         </p>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={exportJson}>

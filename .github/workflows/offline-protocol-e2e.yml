@@ -1,0 +1,221 @@
+name: SiloNR Offline Protocol E2E
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/routes/api/offline/**"
+      - "src/server/offline/**"
+      - "src/server/files/**"
+      - "src/server/db/**"
+      - "scripts/ci-http-seed.ts"
+      - "scripts/ci-offline-assert.ts"
+      - "docker-compose.dev.yml"
+      - ".github/workflows/offline-protocol-e2e.yml"
+  push:
+    branches:
+      - "production/**"
+    paths:
+      - "src/routes/api/offline/**"
+      - "src/server/offline/**"
+      - "src/server/files/**"
+      - "src/server/db/**"
+      - "scripts/ci-http-seed.ts"
+      - "scripts/ci-offline-assert.ts"
+      - "docker-compose.dev.yml"
+      - ".github/workflows/offline-protocol-e2e.yml"
+
+concurrency:
+  group: silonr-offline-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  offline-protocol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: silonr
+          POSTGRES_PASSWORD: silonr
+          POSTGRES_DB: silonr_offline_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U silonr -d silonr_offline_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      APP_URL: http://127.0.0.1:3000
+      DATABASE_URL: postgresql://silonr:silonr@127.0.0.1:5432/silonr_offline_e2e
+      BETTER_AUTH_URL: http://127.0.0.1:3000
+      BETTER_AUTH_SECRET: offline-e2e-secret-at-least-32-characters-long
+      ALLOW_PUBLIC_SIGNUP: "false"
+      VITE_ENABLE_DEMO: "false"
+      S3_ENDPOINT: http://127.0.0.1:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: silonr-private
+      S3_ACCESS_KEY_ID: silonr-local
+      S3_SECRET_ACCESS_KEY: silonr-local-secret-change-me
+      S3_FORCE_PATH_STYLE: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Start private MinIO storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.dev.yml up -d minio create-bucket
+          for _ in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:9000/minio/health/live >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker compose -f docker-compose.dev.yml logs minio create-bucket
+          exit 1
+
+      - name: Create application and auth schema
+        run: |
+          bunx drizzle-kit push --force
+          bun run auth:migrate
+
+      - name: Seed tenant, device pairing and published checklist
+        run: bun run scripts/ci-http-seed.ts
+
+      - name: Exercise offline protocol end to end
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run dev -- --host 127.0.0.1 > /tmp/silonr-offline-e2e.log 2>&1 &
+          APP_PID=$!
+          trap 'kill "$APP_PID" >/dev/null 2>&1 || true' EXIT
+
+          ready=0
+          for _ in $(seq 1 40); do
+            if curl --fail --silent http://127.0.0.1:3000/api/health/live >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat /tmp/silonr-offline-e2e.log
+            exit 1
+          fi
+
+          activation_status=$(curl --silent --show-error --output /tmp/activation.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/offline/activate \
+            --header 'content-type: application/json' \
+            --data '{"code":"CI2026-ACTIVE-OFFLINE","fingerprint":"offline-e2e-install-0000000001","name":"Offline E2E Windows","platform":"windows","appVersion":"0.1.0"}')
+          test "$activation_status" = "201"
+          device_token=$(bun -e 'const v=JSON.parse(await Bun.file("/tmp/activation.json").text()); if(!v.token) process.exit(1); process.stdout.write(v.token)')
+
+          bootstrap_status=$(curl --silent --show-error --output /tmp/bootstrap.json --write-out '%{http_code}' \
+            --header "authorization: Bearer $device_token" \
+            http://127.0.0.1:3000/api/offline/bootstrap)
+          test "$bootstrap_status" = "200"
+          bun -e '
+            const v=JSON.parse(await Bun.file("/tmp/bootstrap.json").text());
+            if(v.protocolVersion!==1) throw new Error("protocol");
+            if(!v.silos?.some((s)=>s.id==="50000000-0000-4000-8000-000000000001")) throw new Error("silo");
+            if(!v.requirements?.some((r)=>r.requirementId==="52000000-0000-4000-8000-000000000001" && r.requirementVersionId==="53000000-0000-4000-8000-000000000001" && r.evidenceRequired===true)) throw new Error("requirement");
+          '
+
+          cat > /tmp/sync-create.json <<'JSON'
+          {"protocolVersion":1,"events":[{"id":"60000000-0000-4000-8000-000000000001","type":"inspection.snapshot","entityId":"61000000-0000-4000-8000-000000000001","createdAt":"2026-08-25T00:00:00.000Z","payload":{"siloId":"50000000-0000-4000-8000-000000000001","inspectionType":"Inspeção E2E offline","notes":"Rascunho criado sem depender de conectividade contínua.","startedAt":"2026-08-25T00:00:00.000Z","baseRevision":0,"finalize":false,"checklist":[{"requirementId":"52000000-0000-4000-8000-000000000001","requirementVersionId":"53000000-0000-4000-8000-000000000001"}],"answers":[{"requirementId":"52000000-0000-4000-8000-000000000001","result":"critico","notes":"Pendência fictícia do teste automatizado.","answeredAt":"2026-08-25T00:01:00.000Z"}]}}]}
+          JSON
+
+          create_status=$(curl --silent --show-error --output /tmp/sync-create-response.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/offline/sync \
+            --header "authorization: Bearer $device_token" \
+            --header 'content-type: application/json' \
+            --data-binary @/tmp/sync-create.json)
+          test "$create_status" = "200"
+          bun -e 'const v=JSON.parse(await Bun.file("/tmp/sync-create-response.json").text()).results?.[0]; if(v?.status!=="applied"||v?.serverRevision!==1||v?.inspectionStatus!=="em_andamento") throw new Error(JSON.stringify(v))'
+
+          replay_status=$(curl --silent --show-error --output /tmp/sync-replay.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/offline/sync \
+            --header "authorization: Bearer $device_token" \
+            --header 'content-type: application/json' \
+            --data-binary @/tmp/sync-create.json)
+          test "$replay_status" = "200"
+          bun -e 'const v=JSON.parse(await Bun.file("/tmp/sync-replay.json").text()).results?.[0]; if(v?.status!=="applied"||v?.serverRevision!==1) throw new Error("idempotency failed")'
+
+          cat > /tmp/sync-stale.json <<'JSON'
+          {"protocolVersion":1,"events":[{"id":"60000000-0000-4000-8000-000000000002","type":"inspection.snapshot","entityId":"61000000-0000-4000-8000-000000000001","createdAt":"2026-08-25T00:02:00.000Z","payload":{"siloId":"50000000-0000-4000-8000-000000000001","inspectionType":"Inspeção E2E offline","notes":"Evento deliberadamente obsoleto.","startedAt":"2026-08-25T00:00:00.000Z","baseRevision":0,"finalize":false,"checklist":[{"requirementId":"52000000-0000-4000-8000-000000000001","requirementVersionId":"53000000-0000-4000-8000-000000000001"}],"answers":[{"requirementId":"52000000-0000-4000-8000-000000000001","result":"critico","notes":"Não pode sobrescrever revisão mais nova.","answeredAt":"2026-08-25T00:02:00.000Z"}]}}]}
+          JSON
+          curl --fail --silent --show-error --output /tmp/sync-stale-response.json \
+            --request POST http://127.0.0.1:3000/api/offline/sync \
+            --header "authorization: Bearer $device_token" \
+            --header 'content-type: application/json' \
+            --data-binary @/tmp/sync-stale.json
+          bun -e 'const v=JSON.parse(await Bun.file("/tmp/sync-stale-response.json").text()).results?.[0]; if(v?.status!=="conflict"||v?.code!=="INSPECTION_CONFLICT") throw new Error(JSON.stringify(v))'
+
+          printf '%s' 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=' | base64 --decode > /tmp/evidence.png
+          evidence_sha=$(sha256sum /tmp/evidence.png | awk '{print $1}')
+          evidence_status=$(curl --silent --show-error --output /tmp/evidence-response.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/offline/evidence-upload \
+            --header "authorization: Bearer $device_token" \
+            --form 'evidenceId=62000000-0000-4000-8000-000000000001' \
+            --form 'inspectionId=61000000-0000-4000-8000-000000000001' \
+            --form 'requirementId=52000000-0000-4000-8000-000000000001' \
+            --form 'description=Foto E2E offline' \
+            --form 'capturedAt=2026-08-25T00:03:00.000Z' \
+            --form "expectedSha256=$evidence_sha" \
+            --form 'file=@/tmp/evidence.png;type=image/png;filename=evidencia.png')
+          test "$evidence_status" = "201"
+          bun -e 'const v=JSON.parse(await Bun.file("/tmp/evidence-response.json").text()); if(v?.idempotent!==false||v?.id!=="62000000-0000-4000-8000-000000000001") throw new Error(JSON.stringify(v))'
+
+          evidence_replay_status=$(curl --silent --show-error --output /tmp/evidence-replay.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/offline/evidence-upload \
+            --header "authorization: Bearer $device_token" \
+            --form 'evidenceId=62000000-0000-4000-8000-000000000001' \
+            --form 'inspectionId=61000000-0000-4000-8000-000000000001' \
+            --form 'requirementId=52000000-0000-4000-8000-000000000001' \
+            --form 'description=Foto E2E offline' \
+            --form 'capturedAt=2026-08-25T00:03:00.000Z' \
+            --form "expectedSha256=$evidence_sha" \
+            --form 'file=@/tmp/evidence.png;type=image/png;filename=evidencia.png')
+          test "$evidence_replay_status" = "200"
+          bun -e 'const v=JSON.parse(await Bun.file("/tmp/evidence-replay.json").text()); if(v?.idempotent!==true) throw new Error(JSON.stringify(v))'
+
+          cat > /tmp/sync-finalize.json <<'JSON'
+          {"protocolVersion":1,"events":[{"id":"60000000-0000-4000-8000-000000000003","type":"inspection.snapshot","entityId":"61000000-0000-4000-8000-000000000001","createdAt":"2026-08-25T00:04:00.000Z","payload":{"siloId":"50000000-0000-4000-8000-000000000001","inspectionType":"Inspeção E2E offline","notes":"Reconectada, evidência confirmada e pronta para concluir.","startedAt":"2026-08-25T00:00:00.000Z","baseRevision":1,"finalize":true,"checklist":[{"requirementId":"52000000-0000-4000-8000-000000000001","requirementVersionId":"53000000-0000-4000-8000-000000000001"}],"answers":[{"requirementId":"52000000-0000-4000-8000-000000000001","result":"critico","notes":"Pendência fictícia que deve gerar não conformidade.","answeredAt":"2026-08-25T00:04:00.000Z"}]}}]}
+          JSON
+          finalize_status=$(curl --silent --show-error --output /tmp/sync-finalize-response.json --write-out '%{http_code}' \
+            --request POST http://127.0.0.1:3000/api/offline/sync \
+            --header "authorization: Bearer $device_token" \
+            --header 'content-type: application/json' \
+            --data-binary @/tmp/sync-finalize.json)
+          test "$finalize_status" = "200"
+          bun -e 'const v=JSON.parse(await Bun.file("/tmp/sync-finalize-response.json").text()).results?.[0]; if(v?.status!=="applied"||v?.serverRevision!==2||v?.inspectionStatus!=="concluida"||v?.findingsCreated!==1) throw new Error(JSON.stringify(v))'
+
+          bun run scripts/ci-offline-assert.ts
+
+      - name: Show server log on failure
+        if: failure()
+        shell: bash
+        run: cat /tmp/silonr-offline-e2e.log 2>/dev/null || true
+
+      - name: Stop MinIO
+        if: always()
+        shell: bash
+        run: docker compose -f docker-compose.dev.yml down -v --remove-orphans || true

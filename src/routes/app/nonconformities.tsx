@@ -13,13 +13,15 @@ import {
 import { Disclaimer, EmptyState, PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/layout/StatusBadge";
 import { TableWrap, Td, Th, Tr } from "@/components/tables/primitives";
+import { ProductionNonconformitiesPage } from "@/components/production/ProductionNonconformitiesPage";
 import { DISCLAIMER, fmtDate } from "@/lib/formatting";
+import { DEMO_MODE_ENABLED } from "@/lib/runtime-mode";
 import { createAction, updateNonconformity } from "@/lib/storage/mutations";
 import { useAppState } from "@/lib/storage/store";
 import type { NcStatus } from "@/types";
 
 export const Route = createFileRoute("/app/nonconformities")({
-  component: NonconformitiesPage,
+  component: NonconformitiesRoutePage,
   head: () => ({
     meta: [
       { title: "Não conformidades — SiloNR" },
@@ -33,7 +35,11 @@ export const Route = createFileRoute("/app/nonconformities")({
   }),
 });
 
-function NonconformitiesPage() {
+function NonconformitiesRoutePage() {
+  return DEMO_MODE_ENABLED ? <DemoNonconformitiesPage /> : <ProductionNonconformitiesPage />;
+}
+
+function DemoNonconformitiesPage() {
   const state = useAppState((s) => s);
   const [busca, setBusca] = useState("");
   const [status, setStatus] = useState("todos");

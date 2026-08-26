@@ -7,7 +7,6 @@ import {
   Gauge,
   History,
   Images,
-  LayoutGrid,
   ListChecks,
   Menu,
   MoreHorizontal,
@@ -20,12 +19,14 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { GuidedTour } from "@/components/layout/GuidedTour";
 import { Button } from "@/components/ui/button";
 import { hydrateStore, resetDemo, useAppState } from "@/lib/storage/store";
 import { cn } from "@/lib/utils";
-import { GuidedTour } from "@/components/layout/GuidedTour";
+import { useWorkspace } from "@/lib/workspace";
+import { can, type Role } from "@/server/rbac";
 
-const NAV = [
+const DEMO_NAV = [
   { to: "/app/dashboard", label: "Visão geral", Icon: Gauge },
   { to: "/app/silos", label: "Silos", Icon: Warehouse },
   { to: "/app/requirements", label: "Matriz de requisitos", Icon: ListChecks },
@@ -40,20 +41,182 @@ const NAV = [
   { to: "/app/settings", label: "Configurações", Icon: Settings },
 ] as const;
 
-export function AppShell({ children }: { children: ReactNode }) {
+const PRODUCTION_NAV = [
+  { to: "/app/overview", label: "Visão geral", Icon: Gauge },
+  { to: "/app/silos", label: "Silos", Icon: Warehouse },
+  { to: "/app/criteria", label: "Matriz de requisitos", Icon: ListChecks },
+  { to: "/app/files", label: "Documentos", Icon: FileText },
+  { to: "/app/inspections", label: "Inspeções", Icon: ClipboardCheck },
+  { to: "/app/nonconformities", label: "Não conformidades", Icon: AlertTriangle },
+  { to: "/app/actions", label: "Ações corretivas", Icon: Wrench },
+  { to: "/app/dossier", label: "Dossiê", Icon: FolderCheck },
+  { to: "/app/history", label: "Histórico", Icon: History },
+  { to: "/app/settings", label: "Configurações", Icon: Settings },
+] as const;
+
+type NavItem = (typeof DEMO_NAV)[number] | (typeof PRODUCTION_NAV)[number];
+
+export function AppShell({
+  children,
+  demoMode,
+  user,
+}: {
+  children: ReactNode;
+  demoMode: boolean;
+  user: { name?: string | null; email?: string | null } | null;
+}) {
   const [open, setOpen] = useState(false);
-  const unidade = useAppState((s) => s.settings.unidadeNome);
-  const local = useAppState((s) => s.settings.unidadeLocal);
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
 
   useEffect(() => {
-    hydrateStore();
-  }, []);
+    if (demoMode) hydrateStore();
+  }, [demoMode]);
 
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
 
+  return demoMode ? (
+    <DemoShell open={open} setOpen={setOpen}>
+      {children}
+    </DemoShell>
+  ) : (
+    <ProductionShell open={open} setOpen={setOpen} user={user}>
+      {children}
+    </ProductionShell>
+  );
+}
+
+function DemoShell({
+  children,
+  open,
+  setOpen,
+}: {
+  children: ReactNode;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+}) {
+  const unidade = useAppState((state) => state.settings.unidadeNome);
+  const local = useAppState((state) => state.settings.unidadeLocal);
+
+  return (
+    <ShellFrame
+      open={open}
+      setOpen={setOpen}
+      nav={DEMO_NAV}
+      unitContent={
+        <>
+          <p className="text-xs uppercase tracking-wide text-sidebar-foreground/60">Unidade</p>
+          <p className="text-sm font-medium">{unidade}</p>
+          <p className="text-xs text-sidebar-foreground/70">{local}</p>
+        </>
+      }
+      footer="Usuário: Gestor Demo"
+      topbar={<DemoBanner onMenu={() => setOpen(true)} />}
+      bottomNav={<BottomNav nav={DEMO_NAV} />}
+    >
+      {children}
+      <GuidedTour />
+    </ShellFrame>
+  );
+}
+
+function ProductionShell({
+  children,
+  open,
+  setOpen,
+  user,
+}: {
+  children: ReactNode;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  user: { name?: string | null; email?: string | null } | null;
+}) {
+  const workspaceState = useWorkspace();
+  const location = workspaceState.workspace
+    ? [workspaceState.workspace.facilityCity, workspaceState.workspace.facilityState]
+        .filter(Boolean)
+        .join(" — ")
+    : "";
+  const role = workspaceState.workspace?.role as Role | undefined;
+  const productionNav = PRODUCTION_NAV.filter((item) => {
+    if (!role) return true;
+    if (item.to === "/app/history") return can(role, "audit.read");
+    return true;
+  });
+
+  return (
+    <ShellFrame
+      open={open}
+      setOpen={setOpen}
+      nav={productionNav}
+      unitContent={
+        workspaceState.loading ? (
+          <p className="text-xs text-sidebar-foreground/70">Carregando acessos…</p>
+        ) : workspaceState.error ? (
+          <p className="text-xs text-destructive">{workspaceState.error}</p>
+        ) : (
+          <div className="space-y-2">
+            <label className="block text-[11px] uppercase tracking-wide text-sidebar-foreground/60">
+              Empresa
+              <select
+                className="mt-1 w-full rounded border border-sidebar-border bg-sidebar-accent px-2 py-1.5 text-xs text-sidebar-accent-foreground"
+                value={workspaceState.workspace?.organizationId ?? ""}
+                onChange={(event) => workspaceState.setOrganizationId(event.target.value)}
+              >
+                {workspaceState.organizations.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-[11px] uppercase tracking-wide text-sidebar-foreground/60">
+              Unidade
+              <select
+                className="mt-1 w-full rounded border border-sidebar-border bg-sidebar-accent px-2 py-1.5 text-xs text-sidebar-accent-foreground"
+                value={workspaceState.workspace?.facilityId ?? ""}
+                onChange={(event) => workspaceState.setFacilityId(event.target.value)}
+              >
+                {workspaceState.facilities.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {location ? <p className="text-xs text-sidebar-foreground/70">{location}</p> : null}
+          </div>
+        )
+      }
+      footer={user?.name || user?.email ? `${user?.name ?? user?.email}` : "Usuário autenticado"}
+      topbar={<ProductionTopbar onMenu={() => setOpen(true)} />}
+      bottomNav={<BottomNav nav={productionNav} />}
+    >
+      {children}
+    </ShellFrame>
+  );
+}
+
+function ShellFrame({
+  children,
+  open,
+  setOpen,
+  nav,
+  unitContent,
+  footer,
+  topbar,
+  bottomNav,
+}: {
+  children: ReactNode;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  nav: ReadonlyArray<NavItem>;
+  unitContent: ReactNode;
+  footer: string;
+  topbar: ReactNode;
+  bottomNav: ReactNode;
+}) {
   return (
     <div className="min-h-screen bg-background">
       <a
@@ -62,7 +225,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         Ir para o conteúdo
       </a>
-
       <div className="flex">
         <aside
           className={cn(
@@ -85,15 +247,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               <X className="size-5" />
             </button>
           </div>
-
-          <div className="border-b border-sidebar-border px-4 py-3">
-            <p className="text-xs uppercase tracking-wide text-sidebar-foreground/60">Unidade</p>
-            <p className="text-sm font-medium">{unidade}</p>
-            <p className="text-xs text-sidebar-foreground/70">{local}</p>
-          </div>
-
+          <div className="border-b border-sidebar-border px-4 py-3">{unitContent}</div>
           <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
-            {NAV.map(({ to, label, Icon }) => (
+            {nav.map(({ to, label, Icon }) => (
               <Link
                 key={to}
                 to={to}
@@ -108,9 +264,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             ))}
           </nav>
-
           <div className="border-t border-sidebar-border px-4 py-3 text-xs text-sidebar-foreground/70">
-            Usuário: Gestor Demo
+            {footer}
           </div>
         </aside>
 
@@ -123,14 +278,33 @@ export function AppShell({ children }: { children: ReactNode }) {
         ) : null}
 
         <div className="flex min-h-screen w-full flex-col lg:pl-64">
-          <DemoBanner onMenu={() => setOpen(true)} />
+          {topbar}
           <main id="conteudo" className="flex-1 px-4 pb-24 pt-5 lg:px-8 lg:pb-10">
             {children}
           </main>
-          <BottomNav />
+          {bottomNav}
         </div>
       </div>
-      <GuidedTour />
+    </div>
+  );
+}
+
+function ProductionTopbar({ onMenu }: { onMenu: () => void }) {
+  return (
+    <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-border bg-card/95 px-4 py-2 backdrop-blur lg:px-8">
+      <button
+        type="button"
+        className="lg:hidden"
+        onClick={onMenu}
+        aria-label="Abrir menu de navegação"
+      >
+        <Menu className="size-5" />
+      </button>
+      <p className="text-xs font-medium text-muted-foreground">AMBIENTE DE PRODUÇÃO</p>
+      <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span className="size-2 rounded-full bg-success" aria-hidden="true" />
+        Sessão autenticada
+      </span>
     </div>
   );
 }
@@ -165,14 +339,15 @@ function DemoBanner({ onMenu }: { onMenu: () => void }) {
   );
 }
 
-function BottomNav() {
+function BottomNav({ nav }: { nav: ReadonlyArray<NavItem> }) {
   const [more, setMore] = useState(false);
+  const quick = nav.slice(0, 3);
   return (
     <>
       {more ? (
         <div className="fixed inset-x-0 bottom-14 z-40 border-t border-border bg-card p-2 shadow-lg lg:hidden">
           <div className="grid grid-cols-2 gap-1">
-            {NAV.map(({ to, label, Icon }) => (
+            {nav.map(({ to, label, Icon }) => (
               <Link
                 key={to}
                 to={to}
@@ -190,21 +365,15 @@ function BottomNav() {
         className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-card lg:hidden"
         aria-label="Navegação rápida"
       >
-        <Link to="/app/dashboard" className="flex flex-col items-center gap-0.5 py-2 text-xs">
-          <LayoutGrid className="size-4" aria-hidden="true" />
-          Início
-        </Link>
-        <Link to="/app/field" className="flex flex-col items-center gap-0.5 py-2 text-xs">
-          <ClipboardCheck className="size-4" aria-hidden="true" />
-          Inspecionar
-        </Link>
-        <Link to="/app/nonconformities" className="flex flex-col items-center gap-0.5 py-2 text-xs">
-          <AlertTriangle className="size-4" aria-hidden="true" />
-          Pendências
-        </Link>
+        {quick.map(({ to, label, Icon }) => (
+          <Link key={to} to={to} className="flex flex-col items-center gap-0.5 py-2 text-xs">
+            <Icon className="size-4" aria-hidden="true" />
+            {label}
+          </Link>
+        ))}
         <button
           type="button"
-          onClick={() => setMore((v) => !v)}
+          onClick={() => setMore((value) => !value)}
           className="flex flex-col items-center gap-0.5 py-2 text-xs"
         >
           <MoreHorizontal className="size-4" aria-hidden="true" />

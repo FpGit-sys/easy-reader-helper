@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Disclaimer, PageHeader } from "@/components/layout/PageHeader";
+import { ProductionDossierPage } from "@/components/production/ProductionDossierPage";
 import { DISCLAIMER } from "@/lib/formatting";
 import { DEFAULT_DOSSIER_OPTIONS, downloadDossier, type DossierOptions } from "@/lib/reports/dossier";
+import { DEMO_MODE_ENABLED } from "@/lib/runtime-mode";
 import { getState, useAppState } from "@/lib/storage/store";
 
 export const Route = createFileRoute("/app/dossier")({
-  component: DossierPage,
+  component: DossierRoutePage,
   head: () => ({
     meta: [
       { title: "Dossiê de prontidão — SiloNR" },
@@ -19,7 +21,7 @@ export const Route = createFileRoute("/app/dossier")({
         content: "Gere um PDF consolidado com requisitos, documentos, inspeções, pendências e ações.",
       },
       { property: "og:title", content: "Dossiê de prontidão — SiloNR" },
-      { property: "og:description", content: "Relatório consolidado do ambiente demonstrativo." },
+      { property: "og:description", content: "Relatório consolidado de prontidão interna." },
     ],
   }),
 });
@@ -34,7 +36,11 @@ const SECOES = [
   ["incluirHistorico", "Trilha de auditoria"],
 ] as const;
 
-function DossierPage() {
+function DossierRoutePage() {
+  return DEMO_MODE_ENABLED ? <DemoDossierPage /> : <ProductionDossierPage />;
+}
+
+function DemoDossierPage() {
   const silos = useAppState((s) => s.silos);
   const [options, setOptions] = useState<DossierOptions>({
     ...DEFAULT_DOSSIER_OPTIONS,

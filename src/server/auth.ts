@@ -1,0 +1,65 @@
+import { betterAuth } from "better-auth";
+import { admin } from "better-auth/plugins";
+import { tanstackStartCookies } from "better-auth/tanstack-start";
+import { getPool } from "@/server/db/client";
+import { getServerEnv } from "@/server/env";
+
+function createAuthInstance() {
+  const env = getServerEnv();
+
+  return betterAuth({
+    database: getPool(),
+    baseURL: env.BETTER_AUTH_URL,
+    secret: env.BETTER_AUTH_SECRET,
+    trustedOrigins: [env.APP_URL],
+    emailAndPassword: {
+      enabled: true,
+      disableSignUp: !env.ALLOW_PUBLIC_SIGNUP,
+      minPasswordLength: 12,
+      maxPasswordLength: 128,
+      revokeSessionsOnPasswordReset: true,
+    },
+    rateLimit: {
+      enabled: env.NODE_ENV === "production",
+      window: 60,
+      max: 100,
+      customRules: {
+        "/sign-in/email": {
+          window: 60,
+          max: 10,
+        },
+      },
+      storage: "memory",
+    },
+    session: {
+      expiresIn: 60 * 60 * 12,
+      updateAge: 60 * 60,
+      cookieCache: {
+        enabled: true,
+        maxAge: 60 * 5,
+      },
+    },
+    advanced: {
+      useSecureCookies: env.NODE_ENV === "production",
+    },
+    plugins: [
+      admin({
+        defaultRole: "user",
+        adminRoles: ["admin"],
+      }),
+      tanstackStartCookies(),
+    ],
+  });
+}
+
+type AuthInstance = ReturnType<typeof createAuthInstance>;
+let instance: AuthInstance | null = null;
+
+/**
+ * Authentication is intentionally lazy so static builds and demo tooling do not
+ * need production secrets. The first production auth request validates env vars.
+ */
+export function getAuth(): AuthInstance {
+  instance ??= createAuthInstance();
+  return instance;
+}

@@ -1,8 +1,12 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { DISCLAIMER } from "@/lib/formatting";
+import { DEMO_MODE_ENABLED } from "@/lib/runtime-mode";
 
 export const Route = createFileRoute("/demo")({
+  beforeLoad: () => {
+    if (!DEMO_MODE_ENABLED) throw redirect({ to: "/login" });
+  },
   head: () => ({
     meta: [
       { title: "Ambiente demonstrativo — SiloNR" },
@@ -73,7 +77,7 @@ function DemoEntryPage() {
           </Button>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Sem login: o acesso é livre e local, apenas para demonstração.
+          Sem login: o acesso é livre e local, apenas nesta compilação demonstrativa.
         </p>
 
         <section id="diagnostico" className="mt-12 rounded border border-border bg-card p-6">

@@ -1,0 +1,98 @@
+name: SiloNR Migration Artifact
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/server/db/schema.ts"
+      - "src/server/db/schema.extensions.ts"
+      - "drizzle.config.ts"
+      - "drizzle/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/migration-artifact.yml"
+  push:
+    branches:
+      - "production/**"
+    paths:
+      - "src/server/db/schema.ts"
+      - "src/server/db/schema.extensions.ts"
+      - "drizzle.config.ts"
+      - "drizzle/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/migration-artifact.yml"
+
+concurrency:
+  group: silonr-migration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: postgresql://silonr:silonr@127.0.0.1:5432/silonr
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Generate Drizzle migration
+        run: bun run db:generate
+
+      - name: Show generated files
+        shell: bash
+        run: |
+          set -euo pipefail
+          find drizzle -maxdepth 3 -type f -print | sort
+          test -n "$(find drizzle -maxdepth 1 -type f -name '*.sql' -print -quit)"
+
+      - name: Reject pull request with uncommitted migration drift
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          drift="$(git status --porcelain -- drizzle)"
+          if [ -n "$drift" ]; then
+            echo "Schema and committed Drizzle migration are out of sync:" >&2
+            echo "$drift" >&2
+            echo "Generate and commit the migration before merging." >&2
+            exit 1
+          fi
+          echo "Committed migrations match the current schema."
+
+      - name: Commit generated migration on production branch
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain -- drizzle)" ]; then
+            echo "Drizzle migration is already committed."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add drizzle
+          git commit -m "Commit generated Drizzle migration"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Upload migration artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SiloNR-Drizzle-Migration
+          path: drizzle/**
+          if-no-files-found: error
