@@ -6,6 +6,8 @@ const elements = {
   pairingSection: $("pairing-section"),
   pairingForm: $("pairing-form"),
   serverUrl: $("server-url"),
+  testServer: $("test-server"),
+  serverStatus: $("server-status"),
   pairingCode: $("pairing-code"),
   deviceName: $("device-name"),
   pairDevice: $("pair-device"),
@@ -348,6 +350,25 @@ async function refreshStatusOnly() {
   currentStatus = await invoke("desktop_status");
   renderStatus(currentStatus);
 }
+
+elements.testServer.addEventListener("click", async () => {
+  clearGlobal();
+  setBusy(elements.testServer, true, "Testando…");
+  elements.serverStatus.textContent = "";
+  try {
+    const result = await invoke("probe_server", { serverUrl: elements.serverUrl.value.trim() });
+    elements.serverUrl.value = result.serverUrl;
+    elements.serverStatus.textContent = result.deployment === "local"
+      ? "Servidor local pronto e protegido por HTTPS."
+      : "Servidor remoto pronto e protegido por HTTPS.";
+    showGlobal("Conexão com o servidor validada.", "success");
+  } catch (error) {
+    elements.serverStatus.textContent = "Não foi possível validar este servidor.";
+    showGlobal(humanError(error));
+  } finally {
+    setBusy(elements.testServer, false, "");
+  }
+});
 
 elements.pairingForm.addEventListener("submit", async (event) => {
   event.preventDefault();

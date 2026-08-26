@@ -54,7 +54,7 @@
         <form id="pairing-form" class="form-grid">
           <label class="field span-2">
             <span>Endereço do servidor</span>
-            <input id="server-url" type="url" placeholder="https://silonr.suaempresa.com.br" required />
+            <input id="server-url" type="url" placeholder="https://192.168.1.50" required />
           </label>
           <label class="field">
             <span>Código de ativação</span>
@@ -65,8 +65,10 @@
             <input id="device-name" type="text" maxlength="120" placeholder="PC Inspeção - Unidade 01" />
           </label>
           <div class="span-2 actions-row">
+            <button id="test-server" class="button secondary" type="button">Testar servidor</button>
             <button id="pair-device" class="button primary" type="submit">Ativar e baixar dados offline</button>
           </div>
+          <p id="server-status" class="span-2" role="status"></p>
         </form>
       </section>
 

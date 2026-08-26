@@ -3,9 +3,18 @@ mod secure_store;
 
 use offline_v2 as offline;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{fs, net::IpAddr, path::PathBuf, time::Duration};
 use tauri::{AppHandle, Manager, WebviewWindow};
 use url::Url;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ServerProbe {
+    server_url: String,
+    deployment: String,
+    live: bool,
+    ready: bool,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct DesktopConfig {
@@ -80,6 +89,46 @@ fn get_saved_server_url(app: AppHandle, window: WebviewWindow) -> Result<Option<
     Ok(read_config(&app)?.map(|config| config.server_url))
 }
 
+fn deployment_kind(url: &Url) -> &'static str {
+    match url.host_str().and_then(|host| host.parse::<IpAddr>().ok()) {
+        Some(IpAddr::V4(ip)) if ip.is_private() || ip.is_loopback() => "local",
+        _ => "cloud",
+    }
+}
+
+#[tauri::command]
+async fn probe_server(window: WebviewWindow, server_url: String) -> Result<ServerProbe, String> {
+    ensure_local_configuration_page(&window)?;
+    let parsed = validate_server_url(&server_url)?;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|error| format!("Não foi possível preparar o teste: {error}"))?;
+
+    async fn healthy(client: &reqwest::Client, base: &Url, path: &str) -> Result<bool, String> {
+        let endpoint = base.join(path).map_err(|_| "Endereço do servidor inválido.".to_string())?;
+        let response = client
+            .get(endpoint)
+            .send()
+            .await
+            .map_err(|error| format!("NETWORK: {error}"))?;
+        Ok(response.status().is_success())
+    }
+
+    let live = healthy(&client, &parsed, "api/health/live").await?;
+    let ready = healthy(&client, &parsed, "api/health/ready").await?;
+    if !live || !ready {
+        return Err("O servidor respondeu, mas ainda não está pronto para uso.".into());
+    }
+
+    Ok(ServerProbe {
+        server_url: parsed.as_str().trim_end_matches('/').to_string(),
+        deployment: deployment_kind(&parsed).to_string(),
+        live,
+        ready,
+    })
+}
+
 #[tauri::command]
 fn connect_to_server(app: AppHandle, window: WebviewWindow, server_url: String) -> Result<(), String> {
     ensure_local_configuration_page(&window)?;
@@ -110,6 +159,7 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             get_saved_server_url,
+            probe_server,
             connect_to_server,
             open_online,
             offline::desktop_status,
