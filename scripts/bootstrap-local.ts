@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { makeAuditEventValues } from "../src/server/audit";
-import { getAuth } from "../src/server/auth";
+import { getCliAuth as getAuth } from "../src/server/auth-cli";
 import { getDb, getPool } from "../src/server/db/client";
 import { auditEvents, facilities, memberships, organizations } from "../src/server/db/schema";
 import { licenses } from "../src/server/db/schema.extensions";
@@ -64,28 +64,67 @@ async function main() {
   const validUntil = new Date(Date.now() + args.trialDays * 86_400_000);
   await db.transaction(async (tx) => {
     await tx.insert(organizations).values({ id: organizationId, name: args.organization });
-    await tx.insert(facilities).values({ id: facilityId, organizationId, name: args.facility, city: args.city ?? null, state: args.state ?? null });
-    await tx.insert(memberships).values({ organizationId, facilityId: null, userId: authUser.id, role: "admin_empresa", active: true });
-    await tx.insert(licenses).values({ organizationId, plan: "professional", status: "trial", validUntil, maxFacilities: 1, maxUsers: 5, offlineGraceDays: 30 });
-    await tx.insert(auditEvents).values(makeAuditEventValues({
-      organizationId,
-      facilityId,
-      actorUserId: authUser.id,
-      eventType: "tenant.provisioned",
-      entityType: "organization",
-      entityId: organizationId,
-      after: { organizationName: args.organization, facilityName: args.facility, trialDays: args.trialDays, provisionedAdminEmail: authUser.email },
-      metadata: { source: "local-bootstrap-cli" },
-    }));
+    await tx
+      .insert(facilities)
+      .values({
+        id: facilityId,
+        organizationId,
+        name: args.facility,
+        city: args.city ?? null,
+        state: args.state ?? null,
+      });
+    await tx
+      .insert(memberships)
+      .values({
+        organizationId,
+        facilityId: null,
+        userId: authUser.id,
+        role: "admin_empresa",
+        active: true,
+      });
+    await tx
+      .insert(licenses)
+      .values({
+        organizationId,
+        plan: "professional",
+        status: "trial",
+        validUntil,
+        maxFacilities: 1,
+        maxUsers: 5,
+        offlineGraceDays: 30,
+      });
+    await tx.insert(auditEvents).values(
+      makeAuditEventValues({
+        organizationId,
+        facilityId,
+        actorUserId: authUser.id,
+        eventType: "tenant.provisioned",
+        entityType: "organization",
+        entityId: organizationId,
+        after: {
+          organizationName: args.organization,
+          facilityName: args.facility,
+          trialDays: args.trialDays,
+          provisionedAdminEmail: authUser.email,
+        },
+        metadata: { source: "local-bootstrap-cli" },
+      }),
+    );
   });
-  console.log(`Instalação local provisionada para ${authUser.email}; trial até ${validUntil.toISOString().slice(0, 10)}.`);
+  console.log(
+    `Instalação local provisionada para ${authUser.email}; trial até ${validUntil.toISOString().slice(0, 10)}.`,
+  );
 }
 
 main()
   .catch((error) => {
-    console.error(`Falha no bootstrap local: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(
+      `Falha no bootstrap local: ${error instanceof Error ? error.message : String(error)}`,
+    );
     process.exitCode = 1;
   })
   .finally(async () => {
-    await getPool().end().catch(() => undefined);
+    await getPool()
+      .end()
+      .catch(() => undefined);
   });

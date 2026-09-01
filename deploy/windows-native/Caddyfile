@@ -1,0 +1,11 @@
+{
+	auto_https disable_redirects
+	admin off
+}
+https://silonr.local {
+	tls internal
+	request_body {
+		max_size 27MB
+	}
+	reverse_proxy 127.0.0.1:3000
+}

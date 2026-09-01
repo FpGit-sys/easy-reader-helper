@@ -27,6 +27,8 @@ dist-ssr
 license-keys-*.csv
 
 # Local deployment outputs
+artifacts/windows-server/
+silonr-native-config*.json
 deploy/local/silonr-local-ca.crt
 silonr-local-diagnostics-*.tar.gz
 

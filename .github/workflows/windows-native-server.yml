@@ -1,0 +1,95 @@
+name: SiloNR Windows Native Server
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "deploy/windows-native/**"
+      - "scripts/native-*"
+      - "scripts/windows-native-smoke.ps1"
+      - "scripts/bootstrap-local.ts"
+      - "src/server/files/**"
+      - "src/server/auth-cli.ts"
+      - "src/server/env.ts"
+      - "src/routes/api/files/**"
+      - "src/routes/api/health/ready.ts"
+      - "src/tests/filesystem-storage.test.ts"
+      - ".github/workflows/windows-native-server.yml"
+  push:
+    branches: ["feature/windows-native-installer"]
+concurrency:
+  group: native-windows-installer
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.0"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+      - name: Validate application
+        shell: pwsh
+        run: |
+          bun install --frozen-lockfile
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          bun run routes:generate
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          bun run typecheck
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          bun run lint
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          bun run test
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          bun run build
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Validate PowerShell syntax
+        shell: powershell
+        run: |
+          Get-ChildItem deploy/windows-native/*.ps1 | ForEach-Object {
+            $tokens=$null; $errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName,[ref]$tokens,[ref]$errors)
+            if ($errors) { $errors | Format-List; exit 1 }
+          }
+      - name: Build Desktop
+        run: |
+          bun run tauri icon src-tauri/icons/app-icon.svg
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          bun run desktop:build
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Ensure Inno Setup compiler
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe')) {
+            choco install innosetup --yes --no-progress
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
+      - name: Build native installer
+        shell: powershell
+        run: ./deploy/windows-native/Build.ps1
+      - name: Install restore upgrade and uninstall without Docker/WSL
+        shell: powershell
+        run: ./scripts/windows-native-smoke.ps1
+      - name: Show safe diagnostics on failure
+        if: failure()
+        shell: powershell
+        run: |
+          Get-Content C:\ProgramData\SiloNR\setup-error.txt -ErrorAction SilentlyContinue
+          Get-Service SiloNR* -ErrorAction SilentlyContinue | Format-Table
+          Get-Content C:\ProgramData\SiloNR\logs\SiloNRApp.err.log -Tail 80 -ErrorAction SilentlyContinue
+          Get-Content C:\ProgramData\SiloNR\logs\SiloNRHTTPS.err.log -Tail 80 -ErrorAction SilentlyContinue
+      - name: Upload verified installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: SiloNR-Servidor-Windows-Nativo
+          path: artifacts/windows-server/output/*.exe
+          if-no-files-found: error

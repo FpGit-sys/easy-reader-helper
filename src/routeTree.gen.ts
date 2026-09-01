@@ -12,15 +12,30 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteRouteImport } from './routes/app/route'
 import { Route as DemoRouteImport } from './routes/demo'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppActionsRouteImport } from './routes/app/actions'
+import { Route as AppCriteriaRouteImport } from './routes/app/criteria'
 import { Route as AppDashboardRouteImport } from './routes/app/dashboard'
 import { Route as AppDocumentsRouteImport } from './routes/app/documents'
 import { Route as AppDossierRouteImport } from './routes/app/dossier'
 import { Route as AppEvidenceRouteImport } from './routes/app/evidence'
 import { Route as AppFieldRouteImport } from './routes/app/field'
+import { Route as AppFilesRouteImport } from './routes/app/files'
 import { Route as AppHistoryRouteImport } from './routes/app/history'
 import { Route as AppNonconformitiesRouteImport } from './routes/app/nonconformities'
+import { Route as AppOverviewRouteImport } from './routes/app/overview'
 import { Route as AppSettingsRouteImport } from './routes/app/settings'
+import { Route as ApiActionsEvidenceUploadRouteImport } from './routes/api/actions/evidence-upload'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiDocumentsUploadRouteImport } from './routes/api/documents/upload'
+import { Route as ApiEvidenceUploadRouteImport } from './routes/api/evidence/upload'
+import { Route as ApiFilesPrivateRouteImport } from './routes/api/files/private'
+import { Route as ApiHealthLiveRouteImport } from './routes/api/health/live'
+import { Route as ApiHealthReadyRouteImport } from './routes/api/health/ready'
+import { Route as ApiOfflineActivateRouteImport } from './routes/api/offline/activate'
+import { Route as ApiOfflineBootstrapRouteImport } from './routes/api/offline/bootstrap'
+import { Route as ApiOfflineEvidenceUploadRouteImport } from './routes/api/offline/evidence-upload'
+import { Route as ApiOfflineSyncRouteImport } from './routes/api/offline/sync'
 import { Route as AppInspectionsIndexRouteImport } from './routes/app/inspections/index'
 import { Route as AppInspectionsInspectionIdRouteImport } from './routes/app/inspections/$inspectionId'
 import { Route as AppInspectionsNewRouteImport } from './routes/app/inspections/new'
@@ -44,9 +59,19 @@ const DemoRoute = DemoRouteImport.update({
   path: '/demo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppActionsRoute = AppActionsRouteImport.update({
   id: '/actions',
   path: '/actions',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppCriteriaRoute = AppCriteriaRouteImport.update({
+  id: '/criteria',
+  path: '/criteria',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
@@ -74,6 +99,11 @@ const AppFieldRoute = AppFieldRouteImport.update({
   path: '/field',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppFilesRoute = AppFilesRouteImport.update({
+  id: '/files',
+  path: '/files',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppHistoryRoute = AppHistoryRouteImport.update({
   id: '/history',
   path: '/history',
@@ -84,10 +114,72 @@ const AppNonconformitiesRoute = AppNonconformitiesRouteImport.update({
   path: '/nonconformities',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppOverviewRoute = AppOverviewRouteImport.update({
+  id: '/overview',
+  path: '/overview',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
   getParentRoute: () => AppRouteRoute,
+} as any)
+const ApiActionsEvidenceUploadRoute =
+  ApiActionsEvidenceUploadRouteImport.update({
+    id: '/api/actions/evidence-upload',
+    path: '/api/actions/evidence-upload',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDocumentsUploadRoute = ApiDocumentsUploadRouteImport.update({
+  id: '/api/documents/upload',
+  path: '/api/documents/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiEvidenceUploadRoute = ApiEvidenceUploadRouteImport.update({
+  id: '/api/evidence/upload',
+  path: '/api/evidence/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFilesPrivateRoute = ApiFilesPrivateRouteImport.update({
+  id: '/api/files/private',
+  path: '/api/files/private',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthLiveRoute = ApiHealthLiveRouteImport.update({
+  id: '/api/health/live',
+  path: '/api/health/live',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthReadyRoute = ApiHealthReadyRouteImport.update({
+  id: '/api/health/ready',
+  path: '/api/health/ready',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOfflineActivateRoute = ApiOfflineActivateRouteImport.update({
+  id: '/api/offline/activate',
+  path: '/api/offline/activate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOfflineBootstrapRoute = ApiOfflineBootstrapRouteImport.update({
+  id: '/api/offline/bootstrap',
+  path: '/api/offline/bootstrap',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOfflineEvidenceUploadRoute =
+  ApiOfflineEvidenceUploadRouteImport.update({
+    id: '/api/offline/evidence-upload',
+    path: '/api/offline/evidence-upload',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiOfflineSyncRoute = ApiOfflineSyncRouteImport.update({
+  id: '/api/offline/sync',
+  path: '/api/offline/sync',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppInspectionsIndexRoute = AppInspectionsIndexRouteImport.update({
   id: '/inspections/',
@@ -130,15 +222,30 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
   '/demo': typeof DemoRoute
+  '/login': typeof LoginRoute
   '/app/actions': typeof AppActionsRoute
+  '/app/criteria': typeof AppCriteriaRoute
   '/app/dashboard': typeof AppDashboardRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/dossier': typeof AppDossierRoute
   '/app/evidence': typeof AppEvidenceRoute
   '/app/field': typeof AppFieldRoute
+  '/app/files': typeof AppFilesRoute
   '/app/history': typeof AppHistoryRoute
   '/app/nonconformities': typeof AppNonconformitiesRoute
+  '/app/overview': typeof AppOverviewRoute
   '/app/settings': typeof AppSettingsRoute
+  '/api/actions/evidence-upload': typeof ApiActionsEvidenceUploadRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/documents/upload': typeof ApiDocumentsUploadRoute
+  '/api/evidence/upload': typeof ApiEvidenceUploadRoute
+  '/api/files/private': typeof ApiFilesPrivateRoute
+  '/api/health/live': typeof ApiHealthLiveRoute
+  '/api/health/ready': typeof ApiHealthReadyRoute
+  '/api/offline/activate': typeof ApiOfflineActivateRoute
+  '/api/offline/bootstrap': typeof ApiOfflineBootstrapRoute
+  '/api/offline/evidence-upload': typeof ApiOfflineEvidenceUploadRoute
+  '/api/offline/sync': typeof ApiOfflineSyncRoute
   '/app/inspections/$inspectionId': typeof AppInspectionsInspectionIdRoute
   '/app/inspections/new': typeof AppInspectionsNewRoute
   '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
@@ -151,15 +258,30 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
   '/demo': typeof DemoRoute
+  '/login': typeof LoginRoute
   '/app/actions': typeof AppActionsRoute
+  '/app/criteria': typeof AppCriteriaRoute
   '/app/dashboard': typeof AppDashboardRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/dossier': typeof AppDossierRoute
   '/app/evidence': typeof AppEvidenceRoute
   '/app/field': typeof AppFieldRoute
+  '/app/files': typeof AppFilesRoute
   '/app/history': typeof AppHistoryRoute
   '/app/nonconformities': typeof AppNonconformitiesRoute
+  '/app/overview': typeof AppOverviewRoute
   '/app/settings': typeof AppSettingsRoute
+  '/api/actions/evidence-upload': typeof ApiActionsEvidenceUploadRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/documents/upload': typeof ApiDocumentsUploadRoute
+  '/api/evidence/upload': typeof ApiEvidenceUploadRoute
+  '/api/files/private': typeof ApiFilesPrivateRoute
+  '/api/health/live': typeof ApiHealthLiveRoute
+  '/api/health/ready': typeof ApiHealthReadyRoute
+  '/api/offline/activate': typeof ApiOfflineActivateRoute
+  '/api/offline/bootstrap': typeof ApiOfflineBootstrapRoute
+  '/api/offline/evidence-upload': typeof ApiOfflineEvidenceUploadRoute
+  '/api/offline/sync': typeof ApiOfflineSyncRoute
   '/app/inspections/$inspectionId': typeof AppInspectionsInspectionIdRoute
   '/app/inspections/new': typeof AppInspectionsNewRoute
   '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
@@ -173,15 +295,30 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/app': typeof AppRouteRouteWithChildren
   '/demo': typeof DemoRoute
+  '/login': typeof LoginRoute
   '/app/actions': typeof AppActionsRoute
+  '/app/criteria': typeof AppCriteriaRoute
   '/app/dashboard': typeof AppDashboardRoute
   '/app/documents': typeof AppDocumentsRoute
   '/app/dossier': typeof AppDossierRoute
   '/app/evidence': typeof AppEvidenceRoute
   '/app/field': typeof AppFieldRoute
+  '/app/files': typeof AppFilesRoute
   '/app/history': typeof AppHistoryRoute
   '/app/nonconformities': typeof AppNonconformitiesRoute
+  '/app/overview': typeof AppOverviewRoute
   '/app/settings': typeof AppSettingsRoute
+  '/api/actions/evidence-upload': typeof ApiActionsEvidenceUploadRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/documents/upload': typeof ApiDocumentsUploadRoute
+  '/api/evidence/upload': typeof ApiEvidenceUploadRoute
+  '/api/files/private': typeof ApiFilesPrivateRoute
+  '/api/health/live': typeof ApiHealthLiveRoute
+  '/api/health/ready': typeof ApiHealthReadyRoute
+  '/api/offline/activate': typeof ApiOfflineActivateRoute
+  '/api/offline/bootstrap': typeof ApiOfflineBootstrapRoute
+  '/api/offline/evidence-upload': typeof ApiOfflineEvidenceUploadRoute
+  '/api/offline/sync': typeof ApiOfflineSyncRoute
   '/app/inspections/$inspectionId': typeof AppInspectionsInspectionIdRoute
   '/app/inspections/new': typeof AppInspectionsNewRoute
   '/app/requirements/$reqId': typeof AppRequirementsReqIdRoute
@@ -196,15 +333,30 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/demo'
+    | '/login'
     | '/app/actions'
+    | '/app/criteria'
     | '/app/dashboard'
     | '/app/documents'
     | '/app/dossier'
     | '/app/evidence'
     | '/app/field'
+    | '/app/files'
     | '/app/history'
     | '/app/nonconformities'
+    | '/app/overview'
     | '/app/settings'
+    | '/api/actions/evidence-upload'
+    | '/api/auth/$'
+    | '/api/documents/upload'
+    | '/api/evidence/upload'
+    | '/api/files/private'
+    | '/api/health/live'
+    | '/api/health/ready'
+    | '/api/offline/activate'
+    | '/api/offline/bootstrap'
+    | '/api/offline/evidence-upload'
+    | '/api/offline/sync'
     | '/app/inspections/$inspectionId'
     | '/app/inspections/new'
     | '/app/requirements/$reqId'
@@ -217,15 +369,30 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/demo'
+    | '/login'
     | '/app/actions'
+    | '/app/criteria'
     | '/app/dashboard'
     | '/app/documents'
     | '/app/dossier'
     | '/app/evidence'
     | '/app/field'
+    | '/app/files'
     | '/app/history'
     | '/app/nonconformities'
+    | '/app/overview'
     | '/app/settings'
+    | '/api/actions/evidence-upload'
+    | '/api/auth/$'
+    | '/api/documents/upload'
+    | '/api/evidence/upload'
+    | '/api/files/private'
+    | '/api/health/live'
+    | '/api/health/ready'
+    | '/api/offline/activate'
+    | '/api/offline/bootstrap'
+    | '/api/offline/evidence-upload'
+    | '/api/offline/sync'
     | '/app/inspections/$inspectionId'
     | '/app/inspections/new'
     | '/app/requirements/$reqId'
@@ -238,15 +405,30 @@ export interface FileRouteTypes {
     | '/'
     | '/app'
     | '/demo'
+    | '/login'
     | '/app/actions'
+    | '/app/criteria'
     | '/app/dashboard'
     | '/app/documents'
     | '/app/dossier'
     | '/app/evidence'
     | '/app/field'
+    | '/app/files'
     | '/app/history'
     | '/app/nonconformities'
+    | '/app/overview'
     | '/app/settings'
+    | '/api/actions/evidence-upload'
+    | '/api/auth/$'
+    | '/api/documents/upload'
+    | '/api/evidence/upload'
+    | '/api/files/private'
+    | '/api/health/live'
+    | '/api/health/ready'
+    | '/api/offline/activate'
+    | '/api/offline/bootstrap'
+    | '/api/offline/evidence-upload'
+    | '/api/offline/sync'
     | '/app/inspections/$inspectionId'
     | '/app/inspections/new'
     | '/app/requirements/$reqId'
@@ -260,6 +442,18 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRouteRoute: typeof AppRouteRouteWithChildren
   DemoRoute: typeof DemoRoute
+  LoginRoute: typeof LoginRoute
+  ApiActionsEvidenceUploadRoute: typeof ApiActionsEvidenceUploadRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiDocumentsUploadRoute: typeof ApiDocumentsUploadRoute
+  ApiEvidenceUploadRoute: typeof ApiEvidenceUploadRoute
+  ApiFilesPrivateRoute: typeof ApiFilesPrivateRoute
+  ApiHealthLiveRoute: typeof ApiHealthLiveRoute
+  ApiHealthReadyRoute: typeof ApiHealthReadyRoute
+  ApiOfflineActivateRoute: typeof ApiOfflineActivateRoute
+  ApiOfflineBootstrapRoute: typeof ApiOfflineBootstrapRoute
+  ApiOfflineEvidenceUploadRoute: typeof ApiOfflineEvidenceUploadRoute
+  ApiOfflineSyncRoute: typeof ApiOfflineSyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -285,11 +479,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DemoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/actions': {
       id: '/app/actions'
       path: '/actions'
       fullPath: '/app/actions'
       preLoaderRoute: typeof AppActionsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/criteria': {
+      id: '/app/criteria'
+      path: '/criteria'
+      fullPath: '/app/criteria'
+      preLoaderRoute: typeof AppCriteriaRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/dashboard': {
@@ -327,6 +535,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppFieldRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/files': {
+      id: '/app/files'
+      path: '/files'
+      fullPath: '/app/files'
+      preLoaderRoute: typeof AppFilesRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/history': {
       id: '/app/history'
       path: '/history'
@@ -341,12 +556,96 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppNonconformitiesRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/overview': {
+      id: '/app/overview'
+      path: '/overview'
+      fullPath: '/app/overview'
+      preLoaderRoute: typeof AppOverviewRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/settings': {
       id: '/app/settings'
       path: '/settings'
       fullPath: '/app/settings'
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRouteRoute
+    }
+    '/api/actions/evidence-upload': {
+      id: '/api/actions/evidence-upload'
+      path: '/api/actions/evidence-upload'
+      fullPath: '/api/actions/evidence-upload'
+      preLoaderRoute: typeof ApiActionsEvidenceUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/documents/upload': {
+      id: '/api/documents/upload'
+      path: '/api/documents/upload'
+      fullPath: '/api/documents/upload'
+      preLoaderRoute: typeof ApiDocumentsUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/evidence/upload': {
+      id: '/api/evidence/upload'
+      path: '/api/evidence/upload'
+      fullPath: '/api/evidence/upload'
+      preLoaderRoute: typeof ApiEvidenceUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/files/private': {
+      id: '/api/files/private'
+      path: '/api/files/private'
+      fullPath: '/api/files/private'
+      preLoaderRoute: typeof ApiFilesPrivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health/live': {
+      id: '/api/health/live'
+      path: '/api/health/live'
+      fullPath: '/api/health/live'
+      preLoaderRoute: typeof ApiHealthLiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health/ready': {
+      id: '/api/health/ready'
+      path: '/api/health/ready'
+      fullPath: '/api/health/ready'
+      preLoaderRoute: typeof ApiHealthReadyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/offline/activate': {
+      id: '/api/offline/activate'
+      path: '/api/offline/activate'
+      fullPath: '/api/offline/activate'
+      preLoaderRoute: typeof ApiOfflineActivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/offline/bootstrap': {
+      id: '/api/offline/bootstrap'
+      path: '/api/offline/bootstrap'
+      fullPath: '/api/offline/bootstrap'
+      preLoaderRoute: typeof ApiOfflineBootstrapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/offline/evidence-upload': {
+      id: '/api/offline/evidence-upload'
+      path: '/api/offline/evidence-upload'
+      fullPath: '/api/offline/evidence-upload'
+      preLoaderRoute: typeof ApiOfflineEvidenceUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/offline/sync': {
+      id: '/api/offline/sync'
+      path: '/api/offline/sync'
+      fullPath: '/api/offline/sync'
+      preLoaderRoute: typeof ApiOfflineSyncRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/app/inspections/': {
       id: '/app/inspections/'
@@ -402,13 +701,16 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteRouteChildren {
   AppActionsRoute: typeof AppActionsRoute
+  AppCriteriaRoute: typeof AppCriteriaRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDocumentsRoute: typeof AppDocumentsRoute
   AppDossierRoute: typeof AppDossierRoute
   AppEvidenceRoute: typeof AppEvidenceRoute
   AppFieldRoute: typeof AppFieldRoute
+  AppFilesRoute: typeof AppFilesRoute
   AppHistoryRoute: typeof AppHistoryRoute
   AppNonconformitiesRoute: typeof AppNonconformitiesRoute
+  AppOverviewRoute: typeof AppOverviewRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppInspectionsInspectionIdRoute: typeof AppInspectionsInspectionIdRoute
   AppInspectionsNewRoute: typeof AppInspectionsNewRoute
@@ -421,13 +723,16 @@ interface AppRouteRouteChildren {
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppActionsRoute: AppActionsRoute,
+  AppCriteriaRoute: AppCriteriaRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDocumentsRoute: AppDocumentsRoute,
   AppDossierRoute: AppDossierRoute,
   AppEvidenceRoute: AppEvidenceRoute,
   AppFieldRoute: AppFieldRoute,
+  AppFilesRoute: AppFilesRoute,
   AppHistoryRoute: AppHistoryRoute,
   AppNonconformitiesRoute: AppNonconformitiesRoute,
+  AppOverviewRoute: AppOverviewRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppInspectionsInspectionIdRoute: AppInspectionsInspectionIdRoute,
   AppInspectionsNewRoute: AppInspectionsNewRoute,
@@ -446,6 +751,18 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRouteRoute: AppRouteRouteWithChildren,
   DemoRoute: DemoRoute,
+  LoginRoute: LoginRoute,
+  ApiActionsEvidenceUploadRoute: ApiActionsEvidenceUploadRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiDocumentsUploadRoute: ApiDocumentsUploadRoute,
+  ApiEvidenceUploadRoute: ApiEvidenceUploadRoute,
+  ApiFilesPrivateRoute: ApiFilesPrivateRoute,
+  ApiHealthLiveRoute: ApiHealthLiveRoute,
+  ApiHealthReadyRoute: ApiHealthReadyRoute,
+  ApiOfflineActivateRoute: ApiOfflineActivateRoute,
+  ApiOfflineBootstrapRoute: ApiOfflineBootstrapRoute,
+  ApiOfflineEvidenceUploadRoute: ApiOfflineEvidenceUploadRoute,
+  ApiOfflineSyncRoute: ApiOfflineSyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
