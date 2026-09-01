@@ -83,7 +83,8 @@ try {
     Invoke-Native "$env:WINDIR\System32\icacls.exe" @($NativeRoot,'/grant:r','*S-1-5-19:(RX)','*S-1-5-20:(RX)') | Out-Null
     Set-PrivateAcl (Join-Path $NativeRoot 'data') 'S-1-5-19' 'RX' -Directory
     Invoke-Native "$env:WINDIR\System32\icacls.exe" @((Join-Path $NativeRoot 'data'),'/grant:r','*S-1-5-20:(RX)') | Out-Null
-    Set-PrivateAcl $ConfigRoot 'S-1-5-19' 'RX' -Directory
+    Set-PrivateAcl $ConfigRoot -Directory
+    Invoke-Native "$env:WINDIR\System32\icacls.exe" @($ConfigRoot,'/grant:r','*S-1-5-19:(RX)') | Out-Null
     Set-PrivateAcl $ObjectsRoot 'S-1-5-19' 'M' -Directory
     Set-PrivateAcl $PgData 'S-1-5-20' 'M' -Directory
     Set-PrivateAcl (Join-Path $NativeRoot 'logs') 'S-1-5-19' 'M' -Directory

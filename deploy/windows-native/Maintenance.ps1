@@ -130,6 +130,8 @@ function Restore-Native {
         Save-Env $values
         if ($native) {
             Move-Item -LiteralPath (Join-Path $NativeRoot 'caddy') -Destination (Join-Path $NativeRoot ('caddy'+$suffix))
+            New-Item -ItemType Directory -Path (Join-Path $NativeRoot 'caddy') | Out-Null
+            Set-PrivateAcl (Join-Path $NativeRoot 'caddy') 'S-1-5-19' 'M' -Directory
             Copy-PrivateTree (Join-Path $source 'tls') (Join-Path $NativeRoot 'caddy')
             Invoke-Native "$env:WINDIR\System32\icacls.exe" @((Join-Path $NativeRoot 'caddy'),'/grant','*S-1-5-19:(OI)(CI)M','/T') | Out-Null
         }

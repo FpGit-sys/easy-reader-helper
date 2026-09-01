@@ -66,6 +66,11 @@ $before=(Get-FileHash $EnvFile -Algorithm SHA256).Hash
 & (Join-Path $tools 'Maintenance.ps1') -Action Restore -BackupPath $backup -Confirmation RESTORE_SILONR_WINDOWS
 if ((Get-FileHash (Join-Path $ObjectsRoot $key) -Algorithm SHA256).Hash.ToLowerInvariant() -ne $digest) { throw 'Restore nao recuperou evidencia.' }
 if ((Get-FileHash $EnvFile -Algorithm SHA256).Hash -ne $before) { throw 'Restore alterou chaves da instalacao.' }
+$tlsAcl = Get-Acl (Join-Path $NativeRoot 'caddy\caddy\pki\authorities\local\root.key')
+foreach ($rule in $tlsAcl.Access) {
+    $sid = $rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value
+    if ($sid -in @('S-1-1-0','S-1-5-11','S-1-5-32-545')) { throw 'Restore expos chave TLS a usuarios comuns.' }
+}
 $result=Start-Process $setup -ArgumentList $arguments -Wait -PassThru
 if ($result.ExitCode -ne 0) { throw 'Atualizacao/reparo falhou.' }
 Wait-Ready 'https://silonr.local/api/health/ready'
