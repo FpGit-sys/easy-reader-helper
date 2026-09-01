@@ -79,6 +79,10 @@ try {
     foreach ($dir in @($NativeRoot,$ConfigRoot,(Join-Path $NativeRoot 'data'),$ObjectsRoot,$PgData,(Join-Path $NativeRoot 'logs'),(Join-Path $NativeRoot 'caddy'))) {
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
     }
+    Set-PrivateAcl $NativeRoot 'S-1-5-32-545' 'RX' -Directory
+    Invoke-Native "$env:WINDIR\System32\icacls.exe" @($NativeRoot,'/grant:r','*S-1-5-19:(RX)','*S-1-5-20:(RX)') | Out-Null
+    Set-PrivateAcl (Join-Path $NativeRoot 'data') 'S-1-5-19' 'RX' -Directory
+    Invoke-Native "$env:WINDIR\System32\icacls.exe" @((Join-Path $NativeRoot 'data'),'/grant:r','*S-1-5-20:(RX)') | Out-Null
     Set-PrivateAcl $ConfigRoot 'S-1-5-19' 'RX' -Directory
     Set-PrivateAcl $ObjectsRoot 'S-1-5-19' 'M' -Directory
     Set-PrivateAcl $PgData 'S-1-5-20' 'M' -Directory
