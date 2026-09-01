@@ -12,6 +12,12 @@ $config=@{
 }
 $config | ConvertTo-Json | Set-Content $configPath -Encoding UTF8
 $arguments=@('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/SILONRCONFIG="{0}"' -f $configPath))
+# Invalid input must produce a nonzero installer exit, not a false success.
+$invalidPath=Join-Path $env:RUNNER_TEMP 'silonr-native-invalid.json'
+$invalid=$config.Clone(); $invalid.ServerAddress='invalid'
+$invalid | ConvertTo-Json | Set-Content $invalidPath -Encoding UTF8
+$rejected=Start-Process $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/SILONRCONFIG="{0}"' -f $invalidPath)) -Wait -PassThru
+if ($rejected.ExitCode -eq 0) { throw 'Instalador ocultou falha de configuracao.' }
 $result=Start-Process $setup -ArgumentList $arguments -Wait -PassThru
 if ($result.ExitCode -ne 0) { throw "Instalador falhou: $($result.ExitCode)" }
 $installed='C:\Program Files\SiloNR Server'

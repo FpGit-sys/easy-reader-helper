@@ -136,8 +136,30 @@ try {
         $passwordFile = Join-Path $ConfigRoot 'init-password.tmp'
         Write-Utf8 $passwordFile $maintenance.PostgresAdminPassword
         Set-PrivateAcl $passwordFile
-        try { Invoke-Native (Join-Path $PgBin 'initdb.exe') @('-D',$PgData,'-U','postgres','--pwfile',$passwordFile,'--auth-host=scram-sha-256','--auth-local=scram-sha-256','--encoding=UTF8','--locale=C') }
-        finally { Remove-Item -LiteralPath $passwordFile -Force -ErrorAction SilentlyContinue }
+        # initdb re-executes with the Administrators SID disabled on Windows.
+        # Give that same installer USER (not Users/Everyone) temporary access,
+        # then revoke it after handing the cluster to NetworkService.
+        $installerSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        $initOut = Join-Path $ConfigRoot 'initdb.out.log'
+        $initErr = Join-Path $ConfigRoot 'initdb.err.log'
+        foreach ($log in @($initOut,$initErr)) { Write-Utf8 $log ''; Set-PrivateAcl $log }
+        try {
+            Invoke-Native "$env:WINDIR\System32\icacls.exe" @($PgData,'/grant:r',("*{0}:(OI)(CI)F" -f $installerSid)) | Out-Null
+            foreach ($parent in @((Join-Path $NativeRoot 'data'),$ConfigRoot)) {
+                Invoke-Native "$env:WINDIR\System32\icacls.exe" @($parent,'/grant:r',("*{0}:RX" -f $installerSid)) | Out-Null
+            }
+            Invoke-Native "$env:WINDIR\System32\icacls.exe" @($passwordFile,'/grant:r',("*{0}:R" -f $installerSid)) | Out-Null
+            $initArguments = @('-D',('"{0}"' -f $PgData),'-U','postgres','--pwfile',('"{0}"' -f $passwordFile),'--auth-host=scram-sha-256','--auth-local=scram-sha-256','--encoding=UTF8','--locale=C')
+            $init = Start-Process (Join-Path $PgBin 'initdb.exe') -ArgumentList $initArguments -RedirectStandardOutput $initOut -RedirectStandardError $initErr -Wait -PassThru
+            if ($init.ExitCode -ne 0) { throw "Falha ao inicializar PostgreSQL ($($init.ExitCode)). Consulte config\initdb.err.log." }
+        } finally {
+            Remove-Item -LiteralPath $passwordFile -Force -ErrorAction SilentlyContinue
+            Invoke-Native "$env:WINDIR\System32\icacls.exe" @($PgData,'/grant:r','*S-1-5-20:(OI)(CI)M','*S-1-5-18:(OI)(CI)F','*S-1-5-32-544:(OI)(CI)F','/T') | Out-Null
+            Invoke-Native "$env:WINDIR\System32\icacls.exe" @($PgData,'/remove:g',("*{0}" -f $installerSid),'/T') | Out-Null
+            foreach ($parent in @((Join-Path $NativeRoot 'data'),$ConfigRoot)) {
+                Invoke-Native "$env:WINDIR\System32\icacls.exe" @($parent,'/remove:g',("*{0}" -f $installerSid)) | Out-Null
+            }
+        }
         Add-Content (Join-Path $PgData 'postgresql.conf') "listen_addresses = '127.0.0.1'"
         Add-Content (Join-Path $PgData 'postgresql.conf') 'port = 54329'
         # initdb creates children as the installer user; grant the service recursively.

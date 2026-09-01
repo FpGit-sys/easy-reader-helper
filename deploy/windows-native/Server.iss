@@ -33,6 +33,9 @@ Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs c
 Name: "{group}\Abrir SiloNR"; Filename: "https://silonr.local"
 Name: "{group}\Administrar servidor"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\Manager.ps1"""
 [Code]
+var
+  ConfigurationFailed: Boolean;
+
 function RunConfiguration(Action: String): Boolean;
 var
   Args, Config: String;
@@ -53,10 +56,25 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
-    if not RunConfiguration('Install') then RaiseException('A configuracao nao foi concluida. Os dados foram preservados. Consulte C:\ProgramData\SiloNR\setup-error.txt e execute o instalador novamente.');
+  begin
+    ConfigurationFailed := not RunConfiguration('Install');
+    if ConfigurationFailed then RaiseException('A configuracao nao foi concluida. Os dados foram preservados. Consulte C:\ProgramData\SiloNR\setup-error.txt e execute o instalador novamente.');
+  end;
 end;
-procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+function GetCustomSetupExitCode: Integer;
 begin
-  if CurUninstallStep = usUninstall then
-    if not RunConfiguration('Uninstall') then RaiseException('Nao foi possivel parar os servicos. Desinstalacao interrompida para preservar os dados.');
+  if ConfigurationFailed then Result := 1001 else Result := 0;
+end;
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if (CurPageID = wpFinished) and ConfigurationFailed then
+  begin
+    WizardForm.FinishedHeadingLabel.Caption := 'Configuracao nao concluida';
+    WizardForm.FinishedLabel.Caption := 'O servidor nao foi liberado. Consulte C:\ProgramData\SiloNR\setup-error.txt e execute o instalador novamente. Seus dados foram preservados.';
+  end;
+end;
+function InitializeUninstall: Boolean;
+begin
+  Result := RunConfiguration('Uninstall');
+  if not Result then SuppressibleMsgBox('Nao foi possivel parar os servicos. Desinstalacao interrompida para preservar os dados.', mbError, MB_OK, IDOK);
 end;

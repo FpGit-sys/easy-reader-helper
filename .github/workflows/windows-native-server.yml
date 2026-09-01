@@ -86,6 +86,8 @@ jobs:
         shell: powershell
         run: |
           Get-Content C:\ProgramData\SiloNR\setup-error.txt -ErrorAction SilentlyContinue
+          Get-Content C:\ProgramData\SiloNR\config\initdb.err.log -Tail 40 -ErrorAction SilentlyContinue
+          Get-Content C:\ProgramData\SiloNR\config\initdb.out.log -Tail 40 -ErrorAction SilentlyContinue
           Get-Service SiloNR* -ErrorAction SilentlyContinue | Format-Table
           Get-Content C:\ProgramData\SiloNR\logs\SiloNRApp.err.log -Tail 80 -ErrorAction SilentlyContinue
           Get-Content C:\ProgramData\SiloNR\logs\SiloNRHTTPS.err.log -Tail 80 -ErrorAction SilentlyContinue
