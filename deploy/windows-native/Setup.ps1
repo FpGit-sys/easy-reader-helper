@@ -29,7 +29,7 @@ function Register-AppService([string]$Id, [string]$DisplayName, [string]$Executa
 <service>
   <id>$Id</id><name>$DisplayName</name><description>SiloNR local, sem Docker/WSL</description>
   <executable>$exe</executable><arguments>$argumentsXml</arguments><workingdirectory>$working</workingdirectory>
-  <serviceaccount><username>NT AUTHORITY\LocalService</username></serviceaccount>
+  <serviceaccount><domain>NT AUTHORITY</domain><user>LocalService</user></serviceaccount>
   <startmode>Automatic</startmode><onfailure action="restart" delay="10 sec"/><stoptimeout>30 sec</stoptimeout>
   <logpath>$logs</logpath><log mode="roll-by-size"><sizeThreshold>10240</sizeThreshold><keepFiles>4</keepFiles></log>
   $Extra
@@ -38,6 +38,8 @@ function Register-AppService([string]$Id, [string]$DisplayName, [string]$Executa
     $wrapper = Join-Path $InstallRoot "services\$Id.exe"
     Write-Utf8 (Join-Path $InstallRoot "services\$Id.xml") $xml
     if (-not (Get-Service $Id -ErrorAction SilentlyContinue)) { Invoke-Native $wrapper @('install') }
+    $account = (Get-CimInstance Win32_Service -Filter "Name='$Id'").StartName
+    if ($account -notmatch 'LocalService|LOCAL SERVICE') { throw "Conta inesperada para $Id; servico nao iniciado." }
 }
 
 try {
@@ -55,6 +57,7 @@ try {
         }
         if (Get-Service 'SiloNRPostgreSQL' -ErrorAction SilentlyContinue) { Invoke-Native (Join-Path $PgBin 'pg_ctl.exe') @('unregister','-N','SiloNRPostgreSQL') }
         Unregister-ScheduledTask -TaskName 'SiloNR Backup Diario' -Confirm:$false -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask -TaskName 'SiloNR Monitor' -Confirm:$false -ErrorAction SilentlyContinue
         Get-NetFirewallRule -Name 'SiloNRNativeHTTPS' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
         # Data, certificates, keys and backups are deliberately NOT removed.
         exit 0
@@ -148,10 +151,10 @@ try {
         } elseif ([int]$orgs -eq 0) { throw 'Bootstrap anterior incompleto. Nenhum dado foi apagado; solicite recuperacao.' }
     }
     $appArguments = '--env-file="{0}" "{1}"' -f $EnvFile,(Join-Path $InstallRoot 'app\.output\server\index.mjs')
-    Register-AppService 'SiloNRApp' 'SiloNR Servidor Local' $Node $appArguments
+    Register-AppService 'SiloNRApp' 'SiloNR Servidor Local' $Node $appArguments '<depend>SiloNRPostgreSQL</depend>'
     $caddyData = [Security.SecurityElement]::Escape((Join-Path $NativeRoot 'caddy'))
     $caddyArguments = 'run --config "{0}" --adapter caddyfile' -f (Join-Path $InstallRoot 'config\Caddyfile')
-    Register-AppService 'SiloNRHTTPS' 'SiloNR HTTPS Local' (Join-Path $InstallRoot 'caddy\caddy.exe') $caddyArguments ('<env name="XDG_DATA_HOME" value="' + $caddyData + '"/>')
+    Register-AppService 'SiloNRHTTPS' 'SiloNR HTTPS Local' (Join-Path $InstallRoot 'caddy\caddy.exe') $caddyArguments ('<depend>SiloNRApp</depend><env name="XDG_DATA_HOME" value="' + $caddyData + '"/>')
     Start-NativeService 'SiloNRApp'
     Wait-Ready
     Start-NativeService 'SiloNRHTTPS'
@@ -173,6 +176,10 @@ try {
     $taskArgs = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -Action Backup' -f (Join-Path $PSScriptRoot 'Maintenance.ps1')
     $taskAction = New-ScheduledTaskAction -Execute "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument $taskArgs
     Register-ScheduledTask -TaskName 'SiloNR Backup Diario' -Action $taskAction -Trigger (New-ScheduledTaskTrigger -Daily -At '21:00') -User 'SYSTEM' -RunLevel Highest -Settings (New-ScheduledTaskSettingsSet -StartWhenAvailable) -Force | Out-Null
+    $monitorArgs = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -Action Monitor' -f (Join-Path $PSScriptRoot 'Maintenance.ps1')
+    $monitorAction = New-ScheduledTaskAction -Execute "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument $monitorArgs
+    $monitorTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(5) -RepetitionInterval (New-TimeSpan -Minutes 5)
+    Register-ScheduledTask -TaskName 'SiloNR Monitor' -Action $monitorAction -Trigger $monitorTrigger -User 'SYSTEM' -RunLevel Highest -Settings (New-ScheduledTaskSettingsSet -StartWhenAvailable) -Force | Out-Null
     Write-Utf8 (Join-Path $ConfigRoot 'complete.json') (@{ Format='silonr-native-v1'; UpdatedAt=[DateTime]::UtcNow.ToString('o') } | ConvertTo-Json)
     Remove-Item -LiteralPath $pending -Force -ErrorAction SilentlyContinue
     Write-Host 'SiloNR instalado. Abra https://silonr.local e ative sua licenca em Administracao.'

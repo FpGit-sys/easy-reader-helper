@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 #Requires -RunAsAdministrator
 [CmdletBinding()]
-param([ValidateSet('Backup','Restore','Diagnostics')][string]$Action = 'Backup', [string]$BackupPath, [string]$Confirmation, [string]$LegacyEnvironment)
+param([ValidateSet('Backup','Restore','Diagnostics','Monitor')][string]$Action = 'Backup', [string]$BackupPath, [string]$Confirmation, [string]$LegacyEnvironment)
 . (Join-Path $PSScriptRoot 'Common.ps1')
 Assert-Admin
 
@@ -144,10 +144,29 @@ function Restore-Native {
     Write-Host 'Se mudou de servidor, execute novamente Setup para atualizar o pacote de conexao/certificado.'
 }
 
+$mutex = New-Object Threading.Mutex($false, 'Global\SiloNRNativeMaintenance')
+$locked = $false
 try {
+    try { $locked = $mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $locked = $true }
+    if (-not $locked) { throw 'Outra operacao de manutencao esta em andamento. Tente novamente depois.' }
     switch ($Action) {
         'Backup' { Backup-Native | Out-Null }
         'Restore' { Restore-Native }
+        'Monitor' {
+            $healthy = $true
+            try { $ready = Invoke-RestMethod 'http://127.0.0.1:3000/api/health/ready' -TimeoutSec 10; $healthy = $ready.status -eq 'ready' } catch { $healthy = $false }
+            $maintenance = Get-Content $MaintenanceFile -Raw | ConvertFrom-Json
+            $drives = @([IO.Path]::GetPathRoot($NativeRoot), [IO.Path]::GetPathRoot($maintenance.BackupPath)) | Select-Object -Unique
+            $disks = @(foreach ($drive in $drives) {
+                $info = New-Object IO.DriveInfo($drive)
+                if (-not $info.IsReady -or $info.AvailableFreeSpace -lt 5GB) { $healthy = $false }
+                @{ drive=$drive; available=if ($info.IsReady) { $info.AvailableFreeSpace } else { 0 } }
+            })
+            $states = @(Get-Service -Name $Services | Select-Object Name,Status)
+            if ($states | Where-Object { $_.Status -ne 'Running' }) { $healthy = $false }
+            Write-Utf8 (Join-Path $NativeRoot 'monitor.json') (@{ healthy=$healthy; checkedAt=[DateTime]::UtcNow.ToString('o'); services=$states; disk=$disks } | ConvertTo-Json -Depth 5)
+            if (-not $healthy) { throw 'Monitor: servico indisponivel ou menos de 5 GB livres. Consulte monitor.json.' }
+        }
         'Diagnostics' {
             # Deliberately exclude logs, environment, recovery files and credentials.
             $report = @{
@@ -162,3 +181,4 @@ try {
         }
     }
 } catch { Write-Error $_.Exception.Message -ErrorAction Continue; throw }
+finally { if ($locked) { $mutex.ReleaseMutex() }; $mutex.Dispose() }

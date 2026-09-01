@@ -62,6 +62,8 @@ A restauração exige confirmação, verifica os arquivos, cria um backup de seg
 
 Não há exclusão automática de backups ou diretórios antigos nesta primeira versão. Acompanhe espaço disponível e defina retenção com cópias validadas. Não apague cópias de segurança antes de testar a recuperação.
 
+A tarefa `SiloNR Monitor` confere serviços, prontidão e espaço a cada cinco minutos, registrando `C:\ProgramData\SiloNR\monitor.json`. Retorna erro se um serviço estiver indisponível ou algum disco usado tiver menos de 5 GB livres. Não envia alertas externos. Backup/restore/monitor são serializados para evitar operações simultâneas.
+
 Em novo servidor, após restaurar um backup nativo, execute o instalador novamente para atualizar confiança no certificado e o pacote de conexão. O IP continua sendo o escolhido para o novo servidor.
 
 ## 6. Migrar dados da stack Docker existente

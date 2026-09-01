@@ -28,7 +28,10 @@ Invoke-RestMethod 'https://silonr.local/api/auth/sign-in/email' -Method Post -Co
 try {
     Invoke-RestMethod 'https://silonr.local/api/auth/sign-up/email' -Method Post -ContentType 'application/json' -Body '{"name":"Intruso","email":"intruso@silonr.local","password":"Not-Allowed-2026!"}' | Out-Null
     throw 'Cadastro publico estava aberto.'
-} catch { if (-not $_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 403) { throw } }
+} catch {
+    if (-not $_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 400) { throw }
+    if ($_.ErrorDetails.Message -notmatch 'EMAIL_PASSWORD_SIGN_UP_DISABLED') { throw }
+}
 $bytes=[Text.Encoding]::UTF8.GetBytes('%PDF-1.7 native smoke')
 $hash=[Security.Cryptography.SHA256]::Create()
 try { $digest=([BitConverter]::ToString($hash.ComputeHash($bytes))).Replace('-','').ToLowerInvariant() } finally { $hash.Dispose() }
@@ -64,6 +67,7 @@ if ((Get-FileHash $EnvFile -Algorithm SHA256).Hash -ne $before) { throw 'Atualiz
 if ([int](Invoke-Database "select count(*) from evidences where name='native smoke';") -ne 1) { throw 'Atualizacao perdeu dados.' }
 if (-not (Test-Path C:\ProgramData\SiloNR\conectar-outros-pcs\SiloNR-Desktop-Setup.exe)) { throw 'Conector Desktop ausente.' }
 & (Join-Path $tools 'Maintenance.ps1') -Action Diagnostics
+& (Join-Path $tools 'Maintenance.ps1') -Action Monitor
 $uninstall=Start-Process (Join-Path $installed 'unins000.exe') -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
 if ($uninstall.ExitCode -ne 0) { throw 'Desinstalacao falhou.' }
 if (-not (Test-Path $EnvFile) -or -not (Test-Path (Join-Path $ObjectsRoot $key))) { throw 'Desinstalacao apagou dados.' }
