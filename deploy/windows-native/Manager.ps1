@@ -22,7 +22,7 @@ foreach ($label in $actions) {
             switch ($sender.Text) {
                 'Backup agora' { & (Join-Path $PSScriptRoot 'Maintenance.ps1') -Action Backup }
                 'Gerar diagnostico' { & (Join-Path $PSScriptRoot 'Maintenance.ps1') -Action Diagnostics }
-                'Conectar outros PCs' { Start-Process explorer.exe (Join-Path $env:ProgramData 'SiloNR\conectar-outros-pcs'); return }
+                'Conectar outros PCs' { Start-Process (Join-Path $env:WINDIR 'explorer.exe') (Join-Path $env:ProgramData 'SiloNR\conectar-outros-pcs'); return }
                 'Restaurar backup' {
                     $dialog=New-Object Windows.Forms.FolderBrowserDialog
                     $dialog.Description='Selecione a pasta de backup nativo do SiloNR'

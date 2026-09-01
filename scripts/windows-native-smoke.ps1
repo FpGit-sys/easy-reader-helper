@@ -31,13 +31,19 @@ foreach ($name in @('SiloNRApp','SiloNRHTTPS')) {
 $login=@{email=$config.AdminEmail;password=$config.AdminPassword} | ConvertTo-Json
 $session=New-Object Microsoft.PowerShell.Commands.WebRequestSession
 Invoke-RestMethod 'https://silonr.local/api/auth/sign-in/email' -Method Post -ContentType 'application/json' -Body $login -WebSession $session | Out-Null
+# HttpClient preserves the response body on HTTP 400 in Windows PowerShell 5.1,
+# where Invoke-RestMethod may leave ErrorDetails null.
+Add-Type -AssemblyName System.Net.Http
+$http = [Net.Http.HttpClient]::new()
+$content = [Net.Http.StringContent]::new('{"name":"Intruso","email":"intruso@silonr.local","password":"Not-Allowed-2026!"}', [Text.Encoding]::UTF8, 'application/json')
 try {
-    Invoke-RestMethod 'https://silonr.local/api/auth/sign-up/email' -Method Post -ContentType 'application/json' -Body '{"name":"Intruso","email":"intruso@silonr.local","password":"Not-Allowed-2026!"}' | Out-Null
-    throw 'Cadastro publico estava aberto.'
-} catch {
-    if (-not $_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 400) { throw }
-    if ($_.ErrorDetails.Message -notmatch 'EMAIL_PASSWORD_SIGN_UP_DISABLED') { throw }
-}
+    $rejectedSignup = $http.PostAsync('https://silonr.local/api/auth/sign-up/email', $content).GetAwaiter().GetResult()
+    try {
+        $errorPayload = $rejectedSignup.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
+        if ([int]$rejectedSignup.StatusCode -ne 400 -or $errorPayload.code -ne 'EMAIL_PASSWORD_SIGN_UP_DISABLED') { throw 'Cadastro publico nao foi bloqueado pelo motivo esperado.' }
+    } finally { $rejectedSignup.Dispose() }
+} finally { $content.Dispose(); $http.Dispose() }
+Write-Host 'Installation, service identities, HTTPS, login and signup restriction passed.'
 $bytes=[Text.Encoding]::UTF8.GetBytes('%PDF-1.7 native smoke')
 $hash=[Security.Cryptography.SHA256]::Create()
 try { $digest=([BitConverter]::ToString($hash.ComputeHash($bytes))).Replace('-','').ToLowerInvariant() } finally { $hash.Dispose() }
