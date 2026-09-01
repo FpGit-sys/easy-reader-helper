@@ -38,6 +38,7 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
+          cache-on-failure: true
       - name: Validate application
         shell: pwsh
         run: |
@@ -65,7 +66,7 @@ jobs:
         run: |
           bun run tauri icon src-tauri/icons/app-icon.svg
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          bun run desktop:build
+          bun run desktop:build --bundles nsis
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Ensure Inno Setup compiler
         shell: pwsh

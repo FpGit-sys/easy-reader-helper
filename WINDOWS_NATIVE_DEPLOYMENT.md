@@ -20,6 +20,8 @@ Os arquivos privados passam a ficar no disco, com os mesmos caminhos de objetos 
 
 O instalador gera automaticamente senha do PostgreSQL, segredo de sessão, segredo de URLs de arquivos e `LICENSE_INSTALLATION_ENCRYPTION_KEY` exclusiva. Reparo/atualização reutilizam esses valores.
 
+O runtime Microsoft Visual C++ necessário ao PostgreSQL é incluído e instalado se ausente/desatualizado. Ele pode pedir uma reinicialização normal do Windows; isso não envolve BIOS ou virtualização. O Desktop mantém seu instalador WebView2 existente, que pode precisar de Internet na primeira instalação se esse componente não estiver presente.
+
 ## 2. Instalar o servidor
 
 1. Em GitHub → Actions → **SiloNR Windows Native Server**, abra uma execução concluída com sucesso e baixe o artefato `SiloNR-Servidor-Windows-Nativo`. Extraia o ZIP de transporte do GitHub.
@@ -36,6 +38,8 @@ O PC servidor também pode ser estação de trabalho: instale nele o Desktop inc
 No menu Iniciar → SiloNR → **Administrar servidor**, abra a pasta de conexão. Copie **somente** `C:\ProgramData\SiloNR\conectar-outros-pcs` para o PC autorizado, mantendo todos os arquivos juntos.
 
 Execute `Conectar-SiloNR.cmd`, autorize como administrador e conclua o instalador Desktop. O script instala o certificado público, configura `silonr.local` e testa HTTPS. No Desktop, informe `https://silonr.local`, teste e conclua o pareamento existente. Esse pareamento não é automatizado pelo conector.
+
+Abra o conector na conta Windows que usará o Desktop. Somente o ajuste de certificado/hosts solicita elevação; a instalação Desktop fica na conta original, mesmo quando outra conta administradora autoriza o UAC.
 
 O certificado público é seguro para distribuir aos PCs autorizados; a pasta `caddy`, os backups e os arquivos de configuração **não são** pacotes de conexão. Se houver um mapeamento `silonr.local` conflitante, o script para e pede correção; não sobrescreve outra instalação silenciosamente.
 

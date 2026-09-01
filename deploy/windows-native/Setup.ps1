@@ -90,6 +90,22 @@ try {
     Set-PrivateAcl (Join-Path $NativeRoot 'caddy') 'S-1-5-19' 'M' -Directory
     if ($config) { Write-Utf8 $pending ($config | ConvertTo-Json); Set-PrivateAcl $pending }
 
+    $redistributable = Join-Path $InstallRoot 'prerequisites\vc_redist.x64.exe'
+    $requiredRuntime = [version]([Diagnostics.FileVersionInfo]::GetVersionInfo($redistributable).ProductVersion)
+    $installedRuntime = [version]'0.0'
+    foreach ($registry in @('HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64','HKLM:\SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64')) {
+        $runtime = Get-ItemProperty -LiteralPath $registry -ErrorAction SilentlyContinue
+        if ($runtime -and $runtime.Installed -eq 1) {
+            $version = [version]$runtime.Version.TrimStart('v')
+            if ($version -gt $installedRuntime) { $installedRuntime = $version }
+        }
+    }
+    if ($installedRuntime -lt $requiredRuntime) {
+        $runtimeInstall = Start-Process $redistributable -ArgumentList '/install','/quiet','/norestart' -Wait -PassThru
+        if ($runtimeInstall.ExitCode -eq 3010) { throw 'O runtime Microsoft pediu reinicializacao. Reinicie o Windows e execute o instalador novamente; nao e preciso alterar BIOS.' }
+        if ($runtimeInstall.ExitCode -ne 0) { throw "Falha ao instalar runtime Microsoft: $($runtimeInstall.ExitCode)." }
+    }
+
     if (-not (Test-Path $EnvFile)) {
         foreach ($port in @(3000,443,54329)) {
             if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) { throw "Porta $port em uso. A instalacao nao alterou o servico existente." }
@@ -189,8 +205,9 @@ try {
     Write-Host 'SiloNR instalado. Abra https://silonr.local e ative sua licenca em Administracao.'
     exit 0
 } catch {
+    $failedLine = $_.InvocationInfo.ScriptLineNumber
     if ($Action -eq 'Install') { Stop-NativeService 'SiloNRApp'; Stop-NativeService 'SiloNRHTTPS' }
-    $message = $_.Exception.Message
+    $message = "Linha ${failedLine}: " + $_.Exception.Message
     if (Test-Path $NativeRoot) { Write-Utf8 (Join-Path $NativeRoot 'setup-error.txt') $message }
     Write-Error $message -ErrorAction Continue
     exit 1
