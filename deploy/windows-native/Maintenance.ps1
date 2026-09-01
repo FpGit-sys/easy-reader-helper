@@ -15,7 +15,7 @@ function Copy-PrivateTree([string]$Source, [string]$Destination) {
     Get-ChildItem -LiteralPath $Source -Force | Copy-Item -Destination $Destination -Recurse -Force
 }
 function Backup-Native {
-    $maintenance = Get-Content $MaintenanceFile -Raw | ConvertFrom-Json
+    $maintenance = Get-Content $MaintenanceFile -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-BackupPath $maintenance.BackupPath
     $bundle = Join-Path $maintenance.BackupPath ('SiloNR-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ') + '-' + [guid]::NewGuid().ToString('N').Substring(0,8))
     New-Item -ItemType Directory -Path $bundle -Force | Out-Null
@@ -64,10 +64,10 @@ function Restore-Native {
     }
     $native = Test-Path (Join-Path $source 'manifest.json')
     if ($native) {
-        $manifest = Get-Content (Join-Path $source 'manifest.json') -Raw | ConvertFrom-Json
+        $manifest = Get-Content (Join-Path $source 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($manifest.format -ne 'silonr-native-backup-v2') { throw 'Formato de backup invalido.' }
         $entries = @($manifest.files)
-        $rawRecovery = Get-Content (Join-Path $source 'recovery.json') -Raw | ConvertFrom-Json
+        $rawRecovery = Get-Content (Join-Path $source 'recovery.json') -Raw -Encoding UTF8 | ConvertFrom-Json
         $recovery = @{}; $rawRecovery.PSObject.Properties | ForEach-Object { $recovery[$_.Name]=$_.Value }
     } else {
         if (-not $LegacyEnvironment) { throw 'Backup Docker exige -LegacyEnvironment com o .env original para preservar as licencas cifradas.' }
@@ -77,7 +77,7 @@ function Restore-Native {
             [pscustomobject]@{path=$Matches[2]; sha256=$Matches[1].ToLowerInvariant()}
         })
         $recovery = @{}
-        foreach ($line in Get-Content -LiteralPath $LegacyEnvironment) {
+        foreach ($line in Get-Content -LiteralPath $LegacyEnvironment -Encoding UTF8) {
             if ($line -match '^([A-Z_][A-Z0-9_]*)=(.*)$') { $recovery[$Matches[1]]=$Matches[2] }
         }
     }
@@ -155,7 +155,7 @@ try {
         'Monitor' {
             $healthy = $true
             try { $ready = Invoke-RestMethod 'http://127.0.0.1:3000/api/health/ready' -TimeoutSec 10; $healthy = $ready.status -eq 'ready' } catch { $healthy = $false }
-            $maintenance = Get-Content $MaintenanceFile -Raw | ConvertFrom-Json
+            $maintenance = Get-Content $MaintenanceFile -Raw -Encoding UTF8 | ConvertFrom-Json
             $drives = @([IO.Path]::GetPathRoot($NativeRoot), [IO.Path]::GetPathRoot($maintenance.BackupPath)) | Select-Object -Unique
             $disks = @(foreach ($drive in $drives) {
                 $info = New-Object IO.DriveInfo($drive)

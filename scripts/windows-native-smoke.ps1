@@ -4,7 +4,7 @@ $setup=(Get-ChildItem (Join-Path $repository 'artifacts\windows-server\output\*.
 $configPath=Join-Path $env:RUNNER_TEMP 'silonr-native-config.json'
 $publicKey=& node -e "process.stdout.write(require('node:crypto').generateKeyPairSync('ed25519').publicKey.export({type:'spki',format:'der'}).toString('base64'))"
 $config=@{
-    ServerAddress='127.0.0.1'; AllowLoopback=$true; BackupPath='C:\SiloNR-CI-Backups'
+    ServerAddress='127.0.0.1'; AllowLoopback=$true; BackupPath=('C:\SiloNR-CI-Backups-' + [char]0x00e7)
     LicenseServiceUrl='https://ci-placeholder.supabase.co/functions/v1'
     LicenseClientApiKey=([guid]::NewGuid().ToString('N')); LicenseSigningPublicKey=$publicKey
     AdminName='Administrador CI'; AdminEmail='native@silonr.local'; AdminPassword='Native-CI-Password-2026!'
@@ -54,7 +54,7 @@ if ($download.Headers['x-silonr-sha256'] -ne $digest) { throw 'Download privado 
 try { Invoke-WebRequest -UseBasicParsing ($url+'x') | Out-Null; throw 'Assinatura adulterada aceita.' }
 catch { if (-not $_.Exception.Response -or [int]$_.Exception.Response.StatusCode -ne 403) { throw } }
 & (Join-Path $tools 'Maintenance.ps1') -Action Backup
-$backup=(Get-ChildItem C:\SiloNR-CI-Backups -Directory | Sort-Object Name | Select-Object -Last 1).FullName
+$backup=(Get-ChildItem -LiteralPath $config.BackupPath -Directory | Sort-Object Name | Select-Object -Last 1).FullName
 $before=(Get-FileHash $EnvFile -Algorithm SHA256).Hash
 [IO.File]::WriteAllText((Join-Path $ObjectsRoot $key),'corrupted')
 & (Join-Path $tools 'Maintenance.ps1') -Action Restore -BackupPath $backup -Confirmation RESTORE_SILONR_WINDOWS

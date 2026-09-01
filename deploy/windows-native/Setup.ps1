@@ -70,8 +70,8 @@ try {
     $config = $null
     $complete = Test-Path (Join-Path $ConfigRoot 'complete.json')
     if (-not $complete) {
-        if (Test-Path $pending) { $raw = Get-Content $pending -Raw | ConvertFrom-Json }
-        elseif ($ConfigurationPath) { $raw = Get-Content -LiteralPath $ConfigurationPath -Raw | ConvertFrom-Json }
+        if (Test-Path $pending) { $raw = Get-Content $pending -Raw -Encoding UTF8 | ConvertFrom-Json }
+        elseif ($ConfigurationPath) { $raw = Get-Content -LiteralPath $ConfigurationPath -Raw -Encoding UTF8 | ConvertFrom-Json }
         else { . (Join-Path $PSScriptRoot 'Wizard.ps1'); $config = Show-SetupWizard }
         if (-not $config) { $config = @{}; $raw.PSObject.Properties | ForEach-Object { $config[$_.Name] = $_.Value } }
         Assert-Configuration $config
@@ -126,7 +126,7 @@ try {
         Save-Env $values
     }
     if (-not (Test-Path $MaintenanceFile)) { throw 'Arquivo de manutencao ausente. Restaure a configuracao; nao regenere as chaves.' }
-    $maintenance = Get-Content $MaintenanceFile -Raw | ConvertFrom-Json
+    $maintenance = Get-Content $MaintenanceFile -Raw -Encoding UTF8 | ConvertFrom-Json
     Assert-BackupPath $maintenance.BackupPath
     New-Item -ItemType Directory -Path $maintenance.BackupPath -Force | Out-Null
     Set-PrivateAcl $maintenance.BackupPath -Directory

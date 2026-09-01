@@ -57,7 +57,7 @@ function Import-Env {
     foreach ($key in $values.Keys) { [Environment]::SetEnvironmentVariable($key, $values[$key], 'Process') }
 }
 function Invoke-Database([string]$Sql, [switch]$Admin) {
-    $maintenance = Get-Content -LiteralPath $MaintenanceFile -Raw | ConvertFrom-Json
+    $maintenance = Get-Content -LiteralPath $MaintenanceFile -Raw -Encoding UTF8 | ConvertFrom-Json
     $values = Read-Env
     $user = 'silonr_app'; $database = 'silonr'
     $password = ([uri]$values.DATABASE_URL).UserInfo.Split(':',2)[1]
