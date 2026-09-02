@@ -36,7 +36,9 @@ public static class SiloNRWizardTest {
 '@
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $setup = (Get-ChildItem (Join-Path $repository 'artifacts\windows-server\output\*.exe') | Select-Object -First 1).FullName
-$installer = Start-Process $setup -ArgumentList '/SP-','/NORESTART' -PassThru
+$setupLog = Join-Path $repository 'artifacts\windows-server\wizard-setup.log'
+Write-Host "Interactive desktop: $([Environment]::UserInteractive); session: $((Get-Process -Id $PID).SessionId)"
+$installer = Start-Process $setup -ArgumentList '/SP-','/NORESTART',('/LOG="{0}"' -f $setupLog) -PassThru
 $null = $installer.Handle
 $family = New-Object 'Collections.Generic.HashSet[int]'
 [void]$family.Add($installer.Id)
@@ -64,16 +66,30 @@ function Click-WindowButton([IntPtr]$Window, [string[]]$Names) {
             $handle = [IntPtr]::new($button.Current.NativeWindowHandle)
             if ($handle -eq [IntPtr]::Zero) { throw "Botao sem handle nativo: $name" }
             if (-not [SiloNRWizardTest]::PostMessage($handle, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)) { throw "Nao foi possivel clicar: $name" }
+            Write-Host "Clicked installer button: $name"
             return $true
         }
     }
     return $false
 }
+function Save-WizardScreenshot([IntPtr]$Window) {
+    $screen = [Windows.Forms.Screen]::FromHandle($Window).Bounds
+    $bitmap = [Drawing.Bitmap]::new($screen.Width,$screen.Height)
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    try {
+        $graphics.CopyFromScreen($screen.Location, [Drawing.Point]::Empty, $screen.Size)
+        $bitmap.Save((Join-Path $repository 'artifacts\windows-server\wizard.png'), [Drawing.Imaging.ImageFormat]::Png)
+    } finally { $graphics.Dispose(); $bitmap.Dispose() }
+}
 try {
     $wizard = [IntPtr]::Zero
+    $lastWindows = ''
     $deadline = (Get-Date).AddMinutes(3)
     do {
-        foreach ($window in Get-InstallerWindows) {
+        $windows = @(Get-InstallerWindows)
+        $titles = ($windows | ForEach-Object { [SiloNRWizardTest]::Title($_) }) -join ' | '
+        if ($titles -ne $lastWindows) { Write-Host "Visible installer windows: $titles"; $lastWindows = $titles }
+        foreach ($window in $windows) {
             $title = [SiloNRWizardTest]::Title($window)
             if ($title -eq 'SiloNR - primeira instalacao') { $wizard = $window; break }
             if ($title -like 'Setup*') { [void](Click-WindowButton $window @('Next >','Install')) }
@@ -90,13 +106,7 @@ try {
     $edits = $root.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Edit))
     if ($edits.Count -ne 10) { throw 'Formulario nao exibiu os dez campos esperados.' }
     foreach ($edit in $edits) { if ($edit.Current.IsOffscreen) { throw 'Campo do formulario fora da tela.' } }
-    $screen = [Windows.Forms.Screen]::FromHandle($wizard).Bounds
-    $bitmap = [Drawing.Bitmap]::new($screen.Width,$screen.Height)
-    $graphics = [Drawing.Graphics]::FromImage($bitmap)
-    try {
-        $graphics.CopyFromScreen($screen.Location, [Drawing.Point]::Empty, $screen.Size)
-        $bitmap.Save((Join-Path $repository 'artifacts\windows-server\wizard.png'), [Drawing.Imaging.ImageFormat]::Png)
-    } finally { $graphics.Dispose(); $bitmap.Dispose() }
+    Save-WizardScreenshot $wizard
     if (-not (Click-WindowButton $wizard @('Configurar servidor'))) { throw 'Botao de configurar servidor ausente.' }
     $validation = [IntPtr]::Zero
     $deadline = (Get-Date).AddSeconds(20)
@@ -120,6 +130,19 @@ try {
     if ($installer.ExitCode -eq 0) { throw 'Cancelamento do formulario foi reportado como instalacao concluida.' }
     if (Test-Path 'C:\ProgramData\SiloNR\config\server.env') { throw 'Cancelar antes de preencher nao deveria configurar o servidor.' }
     Write-Host 'Interactive installer: visible owned wizard, fields, validation and cancellation passed.'
+} catch {
+    $failure = $_
+    try {
+        foreach ($window in Get-InstallerWindows) {
+            Write-Host "Window at failure: $([SiloNRWizardTest]::Title($window))"
+            $root = [Windows.Automation.AutomationElement]::FromHandle($window)
+            $buttons = $root.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Button))
+            foreach ($button in $buttons) { Write-Host "Button: $($button.Current.Name); enabled=$($button.Current.IsEnabled); offscreen=$($button.Current.IsOffscreen)" }
+        }
+        Save-WizardScreenshot ([IntPtr]::Zero)
+    } catch { Write-Warning "UI diagnostics: $($_.Exception.Message)" }
+    if (Test-Path $setupLog) { Get-Content $setupLog -Tail 40 }
+    throw $failure
 } finally {
     foreach ($processId in $family) { Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue }
     $installer.Dispose()

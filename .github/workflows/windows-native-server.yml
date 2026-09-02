@@ -80,6 +80,7 @@ jobs:
         shell: powershell
         run: ./deploy/windows-native/Build.ps1
       - name: Verify interactive installer wizard
+        timeout-minutes: 5
         shell: powershell
         run: ./scripts/windows-native-wizard-smoke.ps1
       - name: Install restore upgrade and uninstall without Docker/WSL
