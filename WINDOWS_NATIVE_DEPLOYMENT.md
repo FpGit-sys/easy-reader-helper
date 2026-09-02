@@ -25,13 +25,15 @@ O runtime Microsoft Visual C++ necessário ao PostgreSQL é incluído e instalad
 ## 2. Instalar o servidor
 
 1. Em GitHub → Actions → **SiloNR Windows Native Server**, abra uma execução concluída com sucesso e baixe o artefato `SiloNR-Servidor-Windows-Nativo`. Extraia o ZIP de transporte do GitHub.
-2. Execute `SiloNR-Servidor-Setup-0.2.0.exe` e autorize a elevação. Enquanto não houver assinatura de código, o Windows poderá alertar sobre editor desconhecido: confira a origem antes de executar; não desative a proteção do sistema.
+2. Execute `SiloNR-Servidor-Setup-0.2.1.exe` e autorize a elevação. Enquanto não houver assinatura de código, o Windows poderá alertar sobre editor desconhecido: confira a origem antes de executar; não desative a proteção do sistema.
 3. O assistente pede IP reservado, pasta de backup, os três valores de licenciamento, nome/e-mail/senha inicial do administrador, empresa e unidade. A senha deve ter 12–128 caracteres.
 4. Aguarde a configuração. Não desligue o PC. O instalador configura serviços, banco, migrações, primeiro administrador, certificado local, hosts, firewall e backup diário às 21h (horário do PC). Se o PC estiver desligado, a tarefa tenta executar quando disponível.
 5. Abra `https://silonr.local`, faça login e use a tela de licença mensal na administração para ativar a **chave legível correspondente à licença paga**. Não use o hash nem o UUID como chave de ativação.
 6. Valide uma inspeção e um upload, ative o Desktop e execute um backup/restauração de teste antes de colocar dados reais.
 
 O PC servidor também pode ser estação de trabalho: instale nele o Desktop incluído. Os demais computadores dependem do servidor ligado para sincronizar. O modo offline existente não é substituído por este instalador.
+
+A versão 0.2.1 abre o formulário de primeira instalação à frente e vinculado ao instalador. A barra cheia significa que os arquivos foram copiados, não que o servidor está pronto: a tela muda para **Configurando o servidor SiloNR** até o processo terminar. Uma janela PowerShell também pode ficar visível durante essa etapa; não a feche. Em reparos com configuração já gravada, o formulário não é repetido. Execuções silenciosas sem configuração prévia falham explicitamente em vez de aguardar uma janela oculta.
 
 ## 3. Conectar outros PCs
 
@@ -101,4 +103,4 @@ Desinstalar remove serviços, regra de firewall, tarefa e binários. **Não apag
 
 O workflow empacota Node 22, PostgreSQL 16.15, Caddy 2.10.2 e WinSW 2.12.0. Downloads de PostgreSQL/Caddy/WinSW têm SHA-256 fixado. O Desktop é compilado do mesmo checkout. Não execute `Build.ps1` em máquinas de clientes; ele é ferramenta de engenharia.
 
-O gate Windows testa instalação silenciosa em banco vazio, contas dos serviços, TLS, login, cadastro público fechado, download com assinatura válida/inválida, backup, restauração após corrupção de arquivo, estabilidade das chaves em atualização e preservação de dados na desinstalação. O conjunto unitário testa armazenamento, hash, links, traversal e expiração. Cenários visuais do assistente, duas máquinas LAN, queda real de energia, ativação Asaas/Supabase real e recuperação de backup legado devem ser verificados no piloto. O novo gate não substitui os gates existentes de isolamento/offline/licenciamento.
+O gate Windows abre o instalador interativo, verifica se o formulário e seus dez campos estão visíveis acima da janela principal, verifica o aviso de validação e cancela sem reportar sucesso falso. Publica uma captura do formulário vazio no artefato `SiloNR-Wizard-Visibility`. Também testa instalação silenciosa em banco vazio, recusa de configuração ausente, contas dos serviços, TLS, login, cadastro público fechado, download com assinatura válida/inválida, backup, restauração após corrupção de arquivo, estabilidade das chaves em atualização e preservação de dados na desinstalação. O conjunto unitário testa armazenamento, hash, links, traversal e expiração. Diferentes resoluções/escalas de tela, Windows 10 real, duas máquinas LAN, queda real de energia, ativação Asaas/Supabase real e recuperação de backup legado devem ser verificados no piloto. O novo gate não substitui os gates existentes de isolamento/offline/licenciamento.

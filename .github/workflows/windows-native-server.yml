@@ -6,6 +6,7 @@ on:
       - "deploy/windows-native/**"
       - "scripts/native-*"
       - "scripts/windows-native-smoke.ps1"
+      - "scripts/windows-native-wizard-smoke.ps1"
       - "scripts/bootstrap-local.ts"
       - "src/server/files/**"
       - "src/server/auth-cli.ts"
@@ -57,7 +58,7 @@ jobs:
       - name: Validate PowerShell syntax
         shell: powershell
         run: |
-          Get-ChildItem deploy/windows-native/*.ps1 | ForEach-Object {
+          Get-ChildItem deploy/windows-native/*.ps1,scripts/windows-native*.ps1 | ForEach-Object {
             $tokens=$null; $errors=$null
             [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName,[ref]$tokens,[ref]$errors)
             if ($errors) { $errors | Format-List; exit 1 }
@@ -78,6 +79,9 @@ jobs:
       - name: Build native installer
         shell: powershell
         run: ./deploy/windows-native/Build.ps1
+      - name: Verify interactive installer wizard
+        shell: powershell
+        run: ./scripts/windows-native-wizard-smoke.ps1
       - name: Install restore upgrade and uninstall without Docker/WSL
         shell: powershell
         run: ./scripts/windows-native-smoke.ps1
@@ -96,4 +100,11 @@ jobs:
         with:
           name: SiloNR-Servidor-Windows-Nativo
           path: artifacts/windows-server/output/*.exe
+          if-no-files-found: error
+      - name: Upload wizard screenshot
+        if: always() && hashFiles('artifacts/windows-server/wizard.png') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: SiloNR-Wizard-Visibility
+          path: artifacts/windows-server/wizard.png
           if-no-files-found: error

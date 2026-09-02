@@ -1,6 +1,11 @@
 #Requires -Version 5.1
 [CmdletBinding()]
-param([ValidateSet('Install','BeforeUpgrade','Uninstall')][string]$Action = 'Install', [string]$ConfigurationPath)
+param(
+    [ValidateSet('Install','BeforeUpgrade','Uninstall')][string]$Action = 'Install',
+    [string]$ConfigurationPath,
+    [long]$InstallerWindowHandle = 0,
+    [switch]$NonInteractive
+)
 . (Join-Path $PSScriptRoot 'Common.ps1')
 Assert-Admin
 
@@ -72,7 +77,11 @@ try {
     if (-not $complete) {
         if (Test-Path $pending) { $raw = Get-Content $pending -Raw -Encoding UTF8 | ConvertFrom-Json }
         elseif ($ConfigurationPath) { $raw = Get-Content -LiteralPath $ConfigurationPath -Raw -Encoding UTF8 | ConvertFrom-Json }
-        else { . (Join-Path $PSScriptRoot 'Wizard.ps1'); $config = Show-SetupWizard }
+        else {
+            if ($NonInteractive) { throw 'A primeira instalacao silenciosa exige /SILONRCONFIG com uma configuracao valida.' }
+            . (Join-Path $PSScriptRoot 'Wizard.ps1')
+            $config = Show-SetupWizard -InstallerWindowHandle $InstallerWindowHandle
+        }
         if (-not $config) { $config = @{}; $raw.PSObject.Properties | ForEach-Object { $config[$_.Name] = $_.Value } }
         Assert-Configuration $config
     }

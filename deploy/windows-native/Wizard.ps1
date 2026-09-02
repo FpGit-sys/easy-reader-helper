@@ -1,12 +1,27 @@
 function Show-SetupWizard {
+    param([long]$InstallerWindowHandle = 0)
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName System.Drawing
+    if (-not ('SiloNR.SetupWindowOwner' -as [type])) {
+        Add-Type -ReferencedAssemblies System.Windows.Forms.dll -TypeDefinition @'
+using System;
+using System.Windows.Forms;
+namespace SiloNR {
+    public sealed class SetupWindowOwner : IWin32Window {
+        public IntPtr Handle { get; private set; }
+        public SetupWindowOwner(long handle) { Handle = new IntPtr(handle); }
+    }
+}
+'@
+    }
     $form = New-Object Windows.Forms.Form
     $form.Text = 'SiloNR - primeira instalacao'
     $form.ClientSize = New-Object Drawing.Size(720, 590)
     $form.StartPosition = 'CenterScreen'
     $form.FormBorderStyle = 'FixedDialog'
     $form.MaximizeBox = $false
+    $form.MinimizeBox = $false
+    $form.ShowInTaskbar = $true
     $form.Font = New-Object Drawing.Font('Segoe UI', 10)
     $fields = @{}
     $definitions = @(
@@ -26,6 +41,8 @@ function Show-SetupWizard {
         $label = New-Object Windows.Forms.Label
         $label.Text = $definition[1]; $label.Location = New-Object Drawing.Point(18,$y); $label.Size = New-Object Drawing.Size(320,22)
         $box = New-Object Windows.Forms.TextBox
+        $box.Name = $definition[0]
+        $box.AccessibleName = $definition[1]
         $box.Location = New-Object Drawing.Point(342,($y-2)); $box.Size = New-Object Drawing.Size(354,25)
         $box.Text = $definition[2]; $box.UseSystemPasswordChar = $definition[0] -in @('AdminPassword','LicenseClientApiKey')
         $fields[$definition[0]] = $box
@@ -41,12 +58,28 @@ function Show-SetupWizard {
         $configuration = @{}
         foreach ($key in $fields.Keys) { $configuration[$key] = $fields[$key].Text.Trim() }
         $configuration.AdminPassword = $fields.AdminPassword.Text
-        try { Assert-Configuration $configuration } catch { [void][Windows.Forms.MessageBox]::Show($_.Exception.Message, 'Verifique os campos'); return }
+        try { Assert-Configuration $configuration } catch { [void][Windows.Forms.MessageBox]::Show($form, $_.Exception.Message, 'Verifique os campos'); return }
         $form.Tag = $configuration
         $form.DialogResult = [Windows.Forms.DialogResult]::OK
         $form.Close()
     })
     $form.Controls.Add($button)
-    if ($form.ShowDialog() -ne [Windows.Forms.DialogResult]::OK) { throw 'Configuracao cancelada; execute o instalador novamente para concluir.' }
-    return $form.Tag
+    $form.AcceptButton = $button
+    # The installer owns the dialog; briefly raise it without keeping it above
+    # the user's password manager or other applications during data entry.
+    $form.Add_Shown({
+        $form.TopMost = $true
+        $form.BringToFront()
+        $form.Activate()
+        $form.TopMost = $false
+        [void]$fields.ServerAddress.Focus()
+    })
+    try {
+        if ($InstallerWindowHandle -ne 0) {
+            $owner = [SiloNR.SetupWindowOwner]::new($InstallerWindowHandle)
+            $result = $form.ShowDialog($owner)
+        } else { $result = $form.ShowDialog() }
+        if ($result -ne [Windows.Forms.DialogResult]::OK) { throw 'Configuracao cancelada; execute o instalador novamente para concluir.' }
+        return $form.Tag
+    } finally { $form.Dispose() }
 }

@@ -12,6 +12,12 @@ $config=@{
 }
 $config | ConvertTo-Json | Set-Content $configPath -Encoding UTF8
 $arguments=@('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/SILONRCONFIG="{0}"' -f $configPath))
+# Unattended first installs must fail promptly instead of hiding an input dialog.
+$missing=Start-Process $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru
+try {
+    if (-not $missing.WaitForExit(60000)) { Stop-Process -Id $missing.Id -Force; throw 'Instalacao silenciosa aguardou um formulario oculto.' }
+    if ($missing.ExitCode -eq 0) { throw 'Instalacao sem configuracao foi aceita.' }
+} finally { $missing.Dispose() }
 # Invalid input must produce a nonzero installer exit, not a false success.
 $invalidPath=Join-Path $env:RUNNER_TEMP 'silonr-native-invalid.json'
 $invalid=$config.Clone(); $invalid.ServerAddress='invalid'
