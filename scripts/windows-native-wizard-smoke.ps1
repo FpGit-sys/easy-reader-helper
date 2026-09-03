@@ -3,8 +3,6 @@
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 if ($env:GITHUB_ACTIONS -ne 'true') { throw 'Este teste instala e cancela o pacote em um runner Windows descartavel do CI.' }
-Add-Type -AssemblyName UIAutomationClient
-Add-Type -AssemblyName UIAutomationTypes
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -TypeDefinition @'
@@ -13,6 +11,8 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 public static class SiloNRWizardTest {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Rect { public int Left, Top, Right, Bottom; }
     private delegate bool EnumProc(IntPtr hwnd, IntPtr param);
     [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc callback, IntPtr param);
     [DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr parent, EnumProc callback, IntPtr param);
@@ -22,6 +22,7 @@ public static class SiloNRWizardTest {
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
+    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hwnd, out Rect rect);
     [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hwnd, uint command);
     [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wparam, IntPtr lparam);
@@ -40,6 +41,11 @@ public static class SiloNRWizardTest {
     }
     public static string ClassName(IntPtr hwnd) {
         var text = new StringBuilder(256); GetClassName(hwnd, text, text.Capacity); return text.ToString();
+    }
+    public static Rect Bounds(IntPtr hwnd) {
+        Rect rect;
+        if (!GetWindowRect(hwnd, out rect)) throw new InvalidOperationException("Cannot read window bounds.");
+        return rect;
     }
     public static int ProcessId(IntPtr hwnd) {
         uint processId; GetWindowThreadProcessId(hwnd, out processId); return (int)processId;
@@ -91,6 +97,10 @@ function Save-WizardScreenshot([IntPtr]$Window) {
         $bitmap.Save((Join-Path $repository 'artifacts\windows-server\wizard.png'), [Drawing.Imaging.ImageFormat]::Png)
     } finally { $graphics.Dispose(); $bitmap.Dispose() }
 }
+function Get-ControlBounds([IntPtr]$Window) {
+    $rect = [SiloNRWizardTest]::Bounds($Window)
+    return [Drawing.Rectangle]::new($rect.Left,$rect.Top,($rect.Right-$rect.Left),($rect.Bottom-$rect.Top))
+}
 try {
     $wizard = [IntPtr]::Zero
     $lastWindows = ''
@@ -112,10 +122,14 @@ try {
     if ($owner -eq [IntPtr]::Zero -or -not $family.Contains([SiloNRWizardTest]::ProcessId($owner)) -or [SiloNRWizardTest]::Title($owner) -notlike 'Setup*') { throw 'Formulario sem vinculo com a janela do instalador.' }
     $order = @([SiloNRWizardTest]::Windows())
     if ([Array]::IndexOf($order,$wizard) -ge [Array]::IndexOf($order,$owner)) { throw 'Formulario ficou atras do instalador.' }
-    $root = [Windows.Automation.AutomationElement]::FromHandle($wizard)
-    $edits = $root.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Edit))
-    if ($edits.Count -ne 10) { throw 'Formulario nao exibiu os dez campos esperados.' }
-    foreach ($edit in $edits) { if ($edit.Current.IsOffscreen) { throw 'Campo do formulario fora da tela.' } }
+    $edits = @([SiloNRWizardTest]::Children($wizard) | Where-Object { [SiloNRWizardTest]::ClassName($_) -match '(^|\.)EDIT(\.|$)' })
+    if ($edits.Count -ne 10) { throw "Formulario exibiu $($edits.Count) campos; esperados: 10." }
+    $formBounds = Get-ControlBounds $wizard
+    $screenBounds = [Windows.Forms.Screen]::FromHandle($wizard).WorkingArea
+    foreach ($edit in $edits) {
+        $bounds = Get-ControlBounds $edit
+        if (-not [SiloNRWizardTest]::IsWindowVisible($edit) -or -not [SiloNRWizardTest]::IsWindowEnabled($edit) -or $bounds.Width -le 0 -or $bounds.Height -le 0 -or -not $screenBounds.Contains($bounds) -or -not $formBounds.Contains($bounds)) { throw 'Campo do formulario oculto, desabilitado ou fora da tela.' }
+    }
     Save-WizardScreenshot $wizard
     if (-not (Click-WindowButton $wizard @('Configurar servidor'))) { throw 'Botao de configurar servidor ausente.' }
     $validation = [IntPtr]::Zero
