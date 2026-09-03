@@ -50,6 +50,15 @@ try {
     } finally { $rejectedSignup.Dispose() }
 } finally { $content.Dispose(); $http.Dispose() }
 Write-Host 'Installation, service identities, HTTPS, login and signup restriction passed.'
+& (Join-Path $PSScriptRoot 'windows-native-desktop-smoke.ps1') -Mode online
+$offlineDatabase = Join-Path $env:APPDATA 'br.com.silonr.desktop\silonr-offline.db'
+Stop-NativeService 'SiloNRApp'
+try {
+    & (Join-Path $PSScriptRoot 'windows-native-desktop-smoke.ps1') -Mode unavailable
+    & (Join-Path $PSScriptRoot 'windows-native-desktop-smoke.ps1') -Mode offline
+} finally { Start-NativeService 'SiloNRApp' }
+Wait-Ready 'https://silonr.local/api/health/ready'
+$offlineBefore = (Get-FileHash $offlineDatabase -Algorithm SHA256).Hash
 $bytes=[Text.Encoding]::UTF8.GetBytes('%PDF-1.7 native smoke')
 $hash=[Security.Cryptography.SHA256]::Create()
 try { $digest=([BitConverter]::ToString($hash.ComputeHash($bytes))).Replace('-','').ToLowerInvariant() } finally { $hash.Dispose() }
@@ -87,6 +96,7 @@ $result=Start-Process $setup -ArgumentList $arguments -Wait -PassThru
 if ($result.ExitCode -ne 0) { throw 'Atualizacao/reparo falhou.' }
 Wait-Ready 'https://silonr.local/api/health/ready'
 if ((Get-FileHash $EnvFile -Algorithm SHA256).Hash -ne $before) { throw 'Atualizacao alterou segredos.' }
+if ((Get-FileHash $offlineDatabase -Algorithm SHA256).Hash -ne $offlineBefore) { throw 'Atualizacao alterou dados offline do Desktop.' }
 if ([int](Invoke-Database "select count(*) from evidences where name='native smoke';") -ne 1) { throw 'Atualizacao perdeu dados.' }
 if (-not (Test-Path C:\ProgramData\SiloNR\conectar-outros-pcs\SiloNR-Desktop-Setup.exe)) { throw 'Conector Desktop ausente.' }
 & (Join-Path $tools 'Maintenance.ps1') -Action Diagnostics
@@ -94,4 +104,6 @@ if (-not (Test-Path C:\ProgramData\SiloNR\conectar-outros-pcs\SiloNR-Desktop-Set
 $uninstall=Start-Process (Join-Path $installed 'unins000.exe') -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
 if ($uninstall.ExitCode -ne 0) { throw 'Desinstalacao falhou.' }
 if (-not (Test-Path $EnvFile) -or -not (Test-Path (Join-Path $ObjectsRoot $key))) { throw 'Desinstalacao apagou dados.' }
+if ((Get-FileHash $offlineDatabase -Algorithm SHA256).Hash -ne $offlineBefore) { throw 'Desinstalacao alterou dados offline do Desktop.' }
+if (Test-Path (Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'SiloNR.lnk')) { throw 'Desinstalacao deixou o atalho do Desktop.' }
 Write-Host 'Native install, TLS, login, private download, backup/restore, upgrade and uninstall passed.'

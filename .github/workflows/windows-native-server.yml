@@ -7,6 +7,9 @@ on:
       - "scripts/native-*"
       - "scripts/windows-native-smoke.ps1"
       - "scripts/windows-native-wizard-smoke.ps1"
+      - "scripts/windows-native-desktop-smoke.*"
+      - "desktop/**"
+      - "src-tauri/**"
       - "scripts/bootstrap-local.ts"
       - "src/server/files/**"
       - "src/server/auth-cli.ts"
@@ -69,6 +72,8 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           bun run desktop:build --bundles nsis
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo test --manifest-path src-tauri/Cargo.toml --release --lib tests::
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Ensure Inno Setup compiler
         shell: pwsh
         run: |
@@ -85,7 +90,11 @@ jobs:
         run: ./scripts/windows-native-wizard-smoke.ps1
       - name: Install restore upgrade and uninstall without Docker/WSL
         shell: powershell
-        run: ./scripts/windows-native-smoke.ps1
+        run: |
+          $env:SILONR_UI_TEST_DEPENDENCIES = Join-Path $env:RUNNER_TEMP 'silonr-playwright'
+          npm install --prefix $env:SILONR_UI_TEST_DEPENDENCIES --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.58.2
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./scripts/windows-native-smoke.ps1
       - name: Show safe diagnostics on failure
         if: failure()
         shell: powershell
@@ -108,4 +117,11 @@ jobs:
         with:
           name: SiloNR-Wizard-Visibility
           path: artifacts/windows-server/wizard.png
+          if-no-files-found: error
+      - name: Upload Desktop screenshots
+        if: always() && hashFiles('artifacts/windows-server/desktop-*.png') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: SiloNR-Desktop-Unificado
+          path: artifacts/windows-server/desktop-*.png
           if-no-files-found: error

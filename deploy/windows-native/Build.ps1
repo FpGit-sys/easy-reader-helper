@@ -61,7 +61,13 @@ foreach ($notice in @(
 $desktop=Get-ChildItem (Join-Path $repository 'src-tauri\target\release\bundle\nsis\*.exe') | Select-Object -First 1
 if (-not $desktop) { throw 'Build Desktop ausente.' }
 Copy-Item $desktop.FullName (Join-Path $stage 'desktop\SiloNR-Desktop-Setup.exe')
-Set-Content (Join-Path $stage 'version.txt') '0.2.1-native-preview' -Encoding ASCII
+Copy-Item (Join-Path $repository 'src-tauri\target\release\silonr-desktop.exe') (Join-Path $stage 'desktop\silonr-desktop.exe')
+# Evergreen bootstrapper is mutable; require Microsoft's Authenticode signature.
+$webview = Join-Path $stage 'prerequisites\MicrosoftEdgeWebview2Setup.exe'
+Invoke-WebRequest -UseBasicParsing 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $webview
+$signature = Get-AuthenticodeSignature $webview
+if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') { throw 'WebView2 sem assinatura Microsoft valida.' }
+Set-Content (Join-Path $stage 'version.txt') '0.2.2-native-preview' -Encoding ASCII
 $compiler='C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
 if (-not (Test-Path $compiler)) { throw 'Instale Inno Setup 6 no ambiente de build.' }
 & $compiler "/DStageDir=$stage" "/DOutputDir=$output" (Join-Path $PSScriptRoot 'Server.iss')

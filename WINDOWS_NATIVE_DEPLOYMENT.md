@@ -4,7 +4,7 @@ Status: pré-piloto. Use somente o artefato de uma execução **verde** de `Silo
 
 ## O que muda e o que permanece
 
-O instalador reúne PostgreSQL 16, Node, Caddy, serviços Windows e o instalador Desktop. Não exige Docker, WSL, Hyper-V, virtualização de BIOS, Bun, Git ou ferramentas de desenvolvimento no cliente. A stack Docker continua disponível, sem alterações de dados automáticas.
+O instalador reúne o aplicativo Desktop, PostgreSQL 16, Node, Caddy e serviços Windows. Cria o atalho **SiloNR** na Área de Trabalho e abre o sistema em uma janela própria, sem navegador externo. Não exige Docker, WSL, Hyper-V, virtualização de BIOS, Bun, Git ou ferramentas de desenvolvimento no cliente. A stack Docker continua disponível, sem alterações de dados automáticas.
 
 Permanecem PostgreSQL, IDs, isolamento entre empresas/unidades, auditoria, cliente Desktop/offline, licenças assinadas e integração Supabase/Asaas. Só o servidor consulta a central de licenças. Inspeções, usuários, documentos e fotos continuam locais. Não altere as chaves de assinatura da central nem regenere o lote de licenças para usar esta versão.
 
@@ -20,18 +20,20 @@ Os arquivos privados passam a ficar no disco, com os mesmos caminhos de objetos 
 
 O instalador gera automaticamente senha do PostgreSQL, segredo de sessão, segredo de URLs de arquivos e `LICENSE_INSTALLATION_ENCRYPTION_KEY` exclusiva. Reparo/atualização reutilizam esses valores.
 
-O runtime Microsoft Visual C++ necessário ao PostgreSQL é incluído e instalado se ausente/desatualizado. Ele pode pedir uma reinicialização normal do Windows; isso não envolve BIOS ou virtualização. O Desktop mantém seu instalador WebView2 existente, que pode precisar de Internet na primeira instalação se esse componente não estiver presente.
+O runtime Microsoft Visual C++ necessário ao PostgreSQL é incluído e instalado se ausente/desatualizado. Ele pode pedir uma reinicialização normal do Windows; isso não envolve BIOS ou virtualização. O pacote também instala o Microsoft WebView2 para todos os usuários se estiver ausente. Essa etapa usa o bootstrapper assinado pela Microsoft e precisa de Internet; não instala nem abre um navegador externo. O runtime WebView2 compartilhado não é removido ao desinstalar o SiloNR.
 
 ## 2. Instalar o servidor
 
 1. Em GitHub → Actions → **SiloNR Windows Native Server**, abra uma execução concluída com sucesso e baixe o artefato `SiloNR-Servidor-Windows-Nativo`. Extraia o ZIP de transporte do GitHub.
-2. Execute `SiloNR-Servidor-Setup-0.2.1.exe` e autorize a elevação. Enquanto não houver assinatura de código, o Windows poderá alertar sobre editor desconhecido: confira a origem antes de executar; não desative a proteção do sistema.
+2. Execute `SiloNR-Servidor-Setup-0.2.2.exe` normalmente e autorize a elevação quando o Windows solicitar. Assim a abertura ao concluir pode voltar à conta original, mesmo quando outra conta administradora autoriza o UAC. Enquanto não houver assinatura de código, o Windows poderá alertar sobre editor desconhecido: confira a origem antes de executar; não desative a proteção do sistema.
 3. O assistente pede IP reservado, pasta de backup, os três valores de licenciamento, nome/e-mail/senha inicial do administrador, empresa e unidade. A senha deve ter 12–128 caracteres.
 4. Aguarde a configuração. Não desligue o PC. O instalador configura serviços, banco, migrações, primeiro administrador, certificado local, hosts, firewall e backup diário às 21h (horário do PC). Se o PC estiver desligado, a tarefa tenta executar quando disponível.
-5. Abra `https://silonr.local`, faça login e use a tela de licença mensal na administração para ativar a **chave legível correspondente à licença paga**. Não use o hash nem o UUID como chave de ativação.
+5. Na conclusão, mantenha **Abrir SiloNR** marcado ou use o atalho **SiloNR** da Área de Trabalho. A tela de login abre dentro do aplicativo, já apontando para o servidor local. Faça login e use a tela de licença mensal na administração para ativar a **chave legível correspondente à licença paga**. Não use o hash nem o UUID como chave de ativação.
 6. Valide uma inspeção e um upload, ative o Desktop e execute um backup/restauração de teste antes de colocar dados reais.
 
-O PC servidor também pode ser estação de trabalho: instale nele o Desktop incluído. Os demais computadores dependem do servidor ligado para sincronizar. O modo offline existente não é substituído por este instalador.
+O PC servidor já fica pronto como estação de trabalho, sem um segundo instalador. O menu Iniciar também inclui **Abrir SiloNR**, **SiloNR - modo offline** e **Administrar servidor**. O atalho principal abre o sistema local; o atalho de modo offline abre a interface empacotada de pareamento e inspeções. A ativação de licença não substitui o pareamento para baixar dados offline. O aplicativo preserva o banco offline e a configuração por usuário Windows; abrir o sistema local não sobrescreve um pareamento existente. Os demais computadores dependem do servidor ligado para sincronizar. O acesso por `https://silonr.local` no navegador permanece opcional.
+
+Se o servidor ainda estiver iniciando, o Desktop mantém a interface local e mostra um aviso. Use **Abrir online** para tentar novamente ou trabalhe offline se já houver um pacote autorizado. Fechar a janela não para o servidor. O atalho nunca contém chaves ou senhas.
 
 A versão 0.2.1 abre o formulário de primeira instalação à frente e vinculado ao instalador. A barra cheia significa que os arquivos foram copiados, não que o servidor está pronto: a tela muda para **Configurando o servidor SiloNR** até o processo terminar. Uma janela PowerShell também pode ficar visível durante essa etapa; não a feche. Em reparos com configuração já gravada, o formulário não é repetido. Execuções silenciosas sem configuração prévia falham explicitamente em vez de aguardar uma janela oculta.
 
@@ -95,6 +97,8 @@ A ida futura para VPS continua possível com PostgreSQL e os mesmos objetos. Nã
 
 Execute o novo instalador sobre o existente. Antes de substituir binários ele faz backup e para os serviços. Usa as mesmas chaves e não repete o primeiro cadastro. Troca de versão principal PostgreSQL não é automática. Não altere manualmente a pasta de banco nem regenere segredos para reparar falhas.
 
+Ao atualizar de 0.2.1 para 0.2.2, não desinstale nem apague pastas: o aplicativo e os atalhos são acrescentados à instalação existente. Feche o Desktop antes de atualizar; o instalador pode solicitar o fechamento se o executável estiver em uso. Ele não força o encerramento. Uma instalação Desktop NSIS/MSI feita separadamente continua independente e não é removida automaticamente.
+
 Se houve queda de energia na primeira instalação, execute novamente o mesmo instalador. A configuração pendente fica protegida para permitir retomada e é removida após sucesso. Um bootstrap incompleto que não possa ser retomado com segurança para e pede recuperação, sem apagar dados.
 
 Desinstalar remove serviços, regra de firewall, tarefa e binários. **Não apaga** banco, anexos, configuração, certificados nem backups. A entrada hosts e a confiança no certificado local também não são removidas automaticamente. Retire-as manualmente apenas quando nenhum cliente depender mais dessa instalação.
@@ -104,3 +108,5 @@ Desinstalar remove serviços, regra de firewall, tarefa e binários. **Não apag
 O workflow empacota Node 22, PostgreSQL 16.15, Caddy 2.10.2 e WinSW 2.12.0. Downloads de PostgreSQL/Caddy/WinSW têm SHA-256 fixado. O Desktop é compilado do mesmo checkout. Não execute `Build.ps1` em máquinas de clientes; ele é ferramenta de engenharia.
 
 O gate Windows abre o instalador interativo, verifica se o formulário e seus dez campos estão visíveis acima da janela principal, verifica o aviso de validação e cancela sem reportar sucesso falso. Publica uma captura do formulário vazio no artefato `SiloNR-Wizard-Visibility`. Também testa instalação silenciosa em banco vazio, recusa de configuração ausente, contas dos serviços, TLS, login, cadastro público fechado, download com assinatura válida/inválida, backup, restauração após corrupção de arquivo, estabilidade das chaves em atualização e preservação de dados na desinstalação. O conjunto unitário testa armazenamento, hash, links, traversal e expiração. Diferentes resoluções/escalas de tela, Windows 10 real, duas máquinas LAN, queda real de energia, ativação Asaas/Supabase real e recuperação de backup legado devem ser verificados no piloto. O novo gate não substitui os gates existentes de isolamento/offline/licenciamento.
+
+O gate também abre o Desktop pelos atalhos reais e usa Playwright conectado ao WebView2 apenas no CI para verificar login dentro do aplicativo, aviso com servidor indisponível e acesso à interface offline. Capturas ficam em `SiloNR-Desktop-Unificado`. A depuração não é ativada no produto ou nos atalhos instalados. Backup/reparo/desinstalação verificam a preservação do banco offline por usuário. O bootstrapper WebView2 é validado por Authenticode; testar sua instalação em Windows 10 sem esse runtime continua sendo parte do piloto.

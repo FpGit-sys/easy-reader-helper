@@ -99,7 +99,11 @@ fn deployment_kind(url: &Url) -> &'static str {
 #[tauri::command]
 async fn probe_server(window: WebviewWindow, server_url: String) -> Result<ServerProbe, String> {
     ensure_local_configuration_page(&window)?;
-    let parsed = validate_server_url(&server_url)?;
+    check_server(&server_url).await
+}
+
+async fn check_server(server_url: &str) -> Result<ServerProbe, String> {
+    let parsed = validate_server_url(server_url)?;
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(10))
         .build()
@@ -129,6 +133,25 @@ async fn probe_server(window: WebviewWindow, server_url: String) -> Result<Serve
     })
 }
 
+fn local_launch_requested(args: impl Iterator<Item = String>) -> bool {
+    args.skip(1).any(|arg| arg == "--local-server")
+}
+
+#[tauri::command]
+async fn open_local_server(window: WebviewWindow) -> Result<bool, String> {
+    ensure_local_configuration_page(&window)?;
+    if !local_launch_requested(std::env::args()) {
+        return Ok(false);
+    }
+    // The unified installer shortcut selects a fixed origin, never a URL from argv.
+    let server = "https://silonr.local";
+    check_server(server).await?;
+    window
+        .navigate(validate_server_url(server)?)
+        .map_err(|error| format!("Nao foi possivel abrir o servidor local: {error}"))?;
+    Ok(true)
+}
+
 #[tauri::command]
 fn connect_to_server(app: AppHandle, window: WebviewWindow, server_url: String) -> Result<(), String> {
     ensure_local_configuration_page(&window)?;
@@ -156,7 +179,7 @@ fn open_online(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{deployment_kind, validate_server_url};
+    use super::{deployment_kind, local_launch_requested, validate_server_url};
     use url::Url;
 
     #[test]
@@ -175,6 +198,24 @@ mod tests {
         let url = Url::parse("https://silonr.example.com").expect("valid URL");
         assert_eq!(deployment_kind(&url), "cloud");
     }
+
+    #[test]
+    fn local_launch_requires_explicit_flag() {
+        assert!(local_launch_requested(
+            ["silonr.exe", "--local-server"].into_iter().map(str::to_string)
+        ));
+        assert!(!local_launch_requested(
+            ["silonr.exe"].into_iter().map(str::to_string)
+        ));
+        assert!(!local_launch_requested(
+            ["--local-server"].into_iter().map(str::to_string)
+        ));
+        assert!(!local_launch_requested(
+            ["silonr.exe", "--local-server=https://other.example"]
+                .into_iter()
+                .map(str::to_string)
+        ));
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -185,6 +226,7 @@ pub fn run() {
             probe_server,
             connect_to_server,
             open_online,
+            open_local_server,
             offline::desktop_status,
             offline::pair_device,
             offline::refresh_offline_pack,
@@ -202,6 +244,9 @@ pub fn run() {
             offline::initialize(app.handle()).map_err(std::io::Error::other)?;
             if let Some(window) = app.get_webview_window("main") {
                 window.set_title("SiloNR — Desktop e modo offline")?;
+                if local_launch_requested(std::env::args()) {
+                    window.maximize()?;
+                }
             }
             Ok(())
         })

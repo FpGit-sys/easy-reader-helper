@@ -5,11 +5,11 @@
   #define OutputDir "output"
 #endif
 #ifndef AppVersion
-  #define AppVersion "0.2.1"
+  #define AppVersion "0.2.2"
 #endif
 [Setup]
 AppId={{A65C80E2-AB46-4DF7-A037-0D4A22EAA0A6}
-AppName=SiloNR Servidor Local
+AppName=SiloNR
 AppVersion={#AppVersion}
 AppPublisher=SiloNR
 DefaultDirName={autopf64}\SiloNR Server
@@ -25,16 +25,29 @@ SolidCompression=yes
 WizardStyle=modern
 DisableProgramGroupPage=yes
 SetupLogging=yes
-CloseApplications=no
+CloseApplications=yes
+CloseApplicationsFilter=silonr-desktop.exe
 RestartApplications=no
+UninstallDisplayIcon={app}\desktop\silonr-desktop.exe
 [Files]
 Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 [Icons]
-Name: "{group}\Abrir SiloNR"; Filename: "https://silonr.local"
+Name: "{commondesktop}\SiloNR"; Filename: "{app}\desktop\silonr-desktop.exe"; Parameters: "--local-server"
+Name: "{group}\Abrir SiloNR"; Filename: "{app}\desktop\silonr-desktop.exe"; Parameters: "--local-server"
+Name: "{group}\SiloNR - modo offline"; Filename: "{app}\desktop\silonr-desktop.exe"
 Name: "{group}\Administrar servidor"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\Manager.ps1"""
+[InstallDelete]
+Type: files; Name: "{group}\Abrir SiloNR.url"
+[Run]
+Filename: "{app}\desktop\silonr-desktop.exe"; Parameters: "--local-server"; Description: "Abrir SiloNR"; Flags: postinstall nowait skipifsilent runasoriginaluser; Check: ConfigurationSucceeded
 [Code]
 var
   ConfigurationFailed: Boolean;
+
+function ConfigurationSucceeded: Boolean;
+begin
+  Result := not ConfigurationFailed;
+end;
 
 function RunConfiguration(Action: String): Boolean;
 var

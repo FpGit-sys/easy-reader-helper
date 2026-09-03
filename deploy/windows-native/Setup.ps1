@@ -47,6 +47,15 @@ function Register-AppService([string]$Id, [string]$DisplayName, [string]$Executa
     if ($account -notmatch 'LocalService|LOCAL SERVICE') { throw "Conta inesperada para $Id; servico nao iniciado." }
 }
 
+function Test-MachineWebView2 {
+    foreach ($path in @('HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}')) {
+        $value = Get-ItemPropertyValue -LiteralPath $path -Name pv -ErrorAction SilentlyContinue
+        $version = $null
+        if ([version]::TryParse([string]$value, [ref]$version) -and $version -gt [version]'0.0.0.0') { return $true }
+    }
+    return $false
+}
+
 try {
     if ($Action -eq 'BeforeUpgrade') {
         if (Test-Path (Join-Path $ConfigRoot 'complete.json')) {
@@ -114,6 +123,15 @@ try {
         $runtimeInstall = Start-Process $redistributable -ArgumentList '/install','/quiet','/norestart' -Wait -PassThru
         if ($runtimeInstall.ExitCode -eq 3010) { throw 'O runtime Microsoft pediu reinicializacao. Reinicie o Windows e execute o instalador novamente; nao e preciso alterar BIOS.' }
         if ($runtimeInstall.ExitCode -ne 0) { throw "Falha ao instalar runtime Microsoft: $($runtimeInstall.ExitCode)." }
+    }
+
+    if (-not (Test-MachineWebView2)) {
+        Write-Host 'Instalando o componente Microsoft WebView2 para abrir o SiloNR. Esta etapa precisa de Internet.'
+        $webview = Join-Path $InstallRoot 'prerequisites\MicrosoftEdgeWebview2Setup.exe'
+        $signature = Get-AuthenticodeSignature $webview
+        if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') { throw 'WebView2 sem assinatura Microsoft valida.' }
+        $webviewInstall = Start-Process $webview -ArgumentList '/silent','/install' -Wait -PassThru
+        if ($webviewInstall.ExitCode -ne 0 -or -not (Test-MachineWebView2)) { throw 'WebView2 nao foi instalado. Verifique a Internet e execute o instalador novamente; a configuracao foi preservada.' }
     }
 
     if (-not (Test-Path $EnvFile)) {
