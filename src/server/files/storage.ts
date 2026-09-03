@@ -6,6 +6,57 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getServerEnv } from "@/server/env";
+import { FilesystemStorage } from "./filesystem-storage";
+
+function localStorage() {
+  const env = getServerEnv();
+  return env.STORAGE_DRIVER === "filesystem"
+    ? new FilesystemStorage(env.FILE_STORAGE_PATH, env.FILE_DOWNLOAD_SIGNING_SECRET)
+    : null;
+}
+
+export async function checkPrivateStorage() {
+  const local = localStorage();
+  if (local) return local.ready();
+  const env = getServerEnv();
+  return Boolean(env.S3_BUCKET && env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY);
+}
+
+export async function servePrivateFile(request: Request): Promise<Response> {
+  const headers = { "cache-control": "private, no-store", "referrer-policy": "no-referrer" };
+  try {
+    const local = localStorage();
+    if (!local) return new Response("Not found", { status: 404, headers });
+    const url = new URL(request.url);
+    const key = url.searchParams.get("key") ?? "";
+    if (
+      !local.verify(
+        key,
+        Number(url.searchParams.get("expires")),
+        url.searchParams.get("signature") ?? "",
+      )
+    ) {
+      return new Response("Invalid or expired download", { status: 403, headers });
+    }
+    const file = await local.read(key);
+    return new Response(new Uint8Array(file.body), {
+      headers: {
+        ...headers,
+        "content-type": file.contentType,
+        "content-length": String(file.body.length),
+        "x-content-type-options": "nosniff",
+        "content-disposition": `inline; filename="${key.split("/").at(-1)}"`,
+        "x-silonr-sha256": file.sha256,
+      },
+    });
+  } catch (error) {
+    const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
+    return new Response(missing ? "Not found" : "File unavailable", {
+      status: missing ? 404 : 503,
+      headers,
+    });
+  }
+}
 
 let client: S3Client | null = null;
 let downloadClient: S3Client | null = null;
@@ -64,6 +115,8 @@ export async function putPrivateObject(input: {
   contentType: string;
   sha256: string;
 }) {
+  const local = localStorage();
+  if (local) return local.put(input);
   await getStorageClient().send(
     new PutObjectCommand({
       Bucket: bucket(),
@@ -79,7 +132,16 @@ export async function putPrivateObject(input: {
 }
 
 export async function createPrivateDownloadUrl(key: string, expiresInSeconds = 300) {
-  const expiresIn = Math.max(30, Math.min(expiresInSeconds, 900));
+  const expiresIn = Math.max(30, Math.min(Math.floor(expiresInSeconds), 900));
+  const local = localStorage();
+  if (local) {
+    const expires = Math.floor(Date.now() / 1000) + expiresIn;
+    const url = new URL("/api/files/private", getServerEnv().APP_URL);
+    url.searchParams.set("key", key);
+    url.searchParams.set("expires", String(expires));
+    url.searchParams.set("signature", local.sign(key, expires));
+    return url.toString();
+  }
   return getSignedUrl(
     getDownloadStorageClient(),
     new GetObjectCommand({ Bucket: bucket(), Key: key }),
@@ -88,5 +150,7 @@ export async function createPrivateDownloadUrl(key: string, expiresInSeconds = 3
 }
 
 export async function deletePrivateObject(key: string) {
+  const local = localStorage();
+  if (local) return local.delete(key);
   await getStorageClient().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
 }

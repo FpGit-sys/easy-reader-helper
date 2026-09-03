@@ -1,5 +1,7 @@
 # SiloNR local — implantação do primeiro piloto
 
+Este guia descreve a opção Docker. Para a instalação nativa no Windows, sem WSL nem virtualização, consulte [WINDOWS_NATIVE_DEPLOYMENT.md](./WINDOWS_NATIVE_DEPLOYMENT.md). O instalador nativo é pré-piloto e possui um gate Windows próprio; não migre dados reais sem validar um restore.
+
 Esta opção roda toda a plataforma em um computador-servidor da empresa e atende os demais computadores pela rede local. Não exige domínio, VPS ou Internet para o uso diário. O mesmo computador pode abrir o SiloNR Desktop e também hospedar os serviços.
 
 ## Modelo e limites
