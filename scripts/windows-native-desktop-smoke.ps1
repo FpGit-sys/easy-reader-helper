@@ -17,6 +17,20 @@ $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0)
 $listener.Start(); $port = $listener.LocalEndpoint.Port; $listener.Stop()
 $screenshots = Join-Path $repository 'artifacts\windows-server'
 $null = New-Item -ItemType Directory -Path $screenshots -Force
+$debugPolicy = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+$policyName = 'silonr-desktop.exe'
+$policyWritten = $false
+function Save-DesktopScreenshot([string]$Suffix) {
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    $screen = [Windows.Forms.SystemInformation]::VirtualScreen
+    $bitmap = [Drawing.Bitmap]::new($screen.Width,$screen.Height)
+    $graphics = [Drawing.Graphics]::FromImage($bitmap)
+    try {
+        $graphics.CopyFromScreen($screen.Location,[Drawing.Point]::Empty,$screen.Size)
+        $bitmap.Save((Join-Path $screenshots "desktop-$Mode-$Suffix.png"),[Drawing.Imaging.ImageFormat]::Png)
+    } finally { $graphics.Dispose(); $bitmap.Dispose() }
+}
 $process = $null
 try {
     Start-Process -FilePath $shortcut
@@ -31,35 +45,39 @@ try {
     [void]$process.CloseMainWindow()
     if (-not $process.WaitForExit(10000)) { throw 'Desktop nao fechou normalmente apos abrir pelo atalho.' }
     Start-Sleep -Seconds 1
-    # ShellExecute can delegate .lnk launches to Explorer, losing this process's environment.
-    # Inspect the same installed target/arguments via CreateProcess with CI-only debugging.
+    # Elevated WebView2 hosts ignore environment overrides. Use a temporary, app-specific
+    # machine policy only on this disposable CI runner, never in the installed product.
+    if ((Test-Path $debugPolicy) -and ((Get-Item $debugPolicy).GetValueNames() -contains $policyName)) {
+        throw 'Politica WebView2 do SiloNR ja configurada; o teste nao deve sobrescreve-la.'
+    }
+    if (-not (Test-Path $debugPolicy)) { $null = New-Item -Path $debugPolicy -Force }
+    $null = New-ItemProperty -Path $debugPolicy -Name $policyName -PropertyType String -Value "--remote-debugging-port=$port --remote-debugging-address=127.0.0.1"
+    $policyWritten = $true
     $start = [Diagnostics.ProcessStartInfo]::new()
     $start.FileName = $link.TargetPath
     $start.Arguments = $link.Arguments
     $start.WorkingDirectory = Split-Path $link.TargetPath -Parent
     $start.UseShellExecute = $false
-    $start.EnvironmentVariables['WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS'] = "--remote-debugging-port=$port --remote-debugging-address=127.0.0.1"
     $process = [Diagnostics.Process]::Start($start)
     & node (Join-Path $PSScriptRoot 'windows-native-desktop-smoke.mjs') $port $Mode (Join-Path $repository "artifacts\windows-server\desktop-$Mode.png")
     if ($LASTEXITCODE -ne 0) { throw "Interface Desktop falhou: $Mode" }
+    Save-DesktopScreenshot 'window'
     if (-not (Test-Path (Join-Path $env:APPDATA 'br.com.silonr.desktop\silonr-offline.db'))) { throw 'Desktop nao inicializou o banco offline por usuario.' }
     Write-Host "Desktop shortcut, native window and user storage passed: $Mode"
 } catch {
-    try {
-        Add-Type -AssemblyName System.Windows.Forms
-        Add-Type -AssemblyName System.Drawing
-        $screen = [Windows.Forms.SystemInformation]::VirtualScreen
-        $bitmap = [Drawing.Bitmap]::new($screen.Width,$screen.Height)
-        $graphics = [Drawing.Graphics]::FromImage($bitmap)
-        try {
-            $graphics.CopyFromScreen($screen.Location,[Drawing.Point]::Empty,$screen.Size)
-            $bitmap.Save((Join-Path $screenshots "desktop-$Mode-failure.png"))
-        } finally { $graphics.Dispose(); $bitmap.Dispose() }
-    } catch { Write-Warning "Nao foi possivel capturar a janela: $_" }
+    try { Save-DesktopScreenshot 'failure' }
+    catch { Write-Warning "Nao foi possivel capturar a janela: $_" }
     throw
 } finally {
-    if ($process -and -not $process.HasExited) {
-        [void]$process.CloseMainWindow()
-        if (-not $process.WaitForExit(10000)) { Stop-Process -Id $process.Id -Force }
+    try {
+        if ($process -and -not $process.HasExited) {
+            [void]$process.CloseMainWindow()
+            if (-not $process.WaitForExit(10000)) { Stop-Process -Id $process.Id -Force }
+        }
+    } finally {
+        if ($policyWritten) {
+            Remove-ItemProperty -Path $debugPolicy -Name $policyName
+            if ((Get-Item $debugPolicy).GetValueNames() -contains $policyName) { throw 'Politica temporaria de depuracao nao foi removida.' }
+        }
     }
 }
