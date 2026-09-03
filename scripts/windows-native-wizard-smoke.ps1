@@ -15,9 +15,13 @@ using System.Text;
 public static class SiloNRWizardTest {
     private delegate bool EnumProc(IntPtr hwnd, IntPtr param);
     [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc callback, IntPtr param);
+    [DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr parent, EnumProc callback, IntPtr param);
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] private static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int length);
+    [DllImport("user32.dll", CharSet=CharSet.Unicode)] private static extern int GetClassName(IntPtr hwnd, StringBuilder text, int length);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
+    [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr hwnd);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hwnd);
     [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr hwnd, uint command);
     [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wparam, IntPtr lparam);
@@ -28,6 +32,14 @@ public static class SiloNRWizardTest {
     }
     public static string Title(IntPtr hwnd) {
         var text = new StringBuilder(512); GetWindowText(hwnd, text, text.Capacity); return text.ToString();
+    }
+    public static IntPtr[] Children(IntPtr parent) {
+        var result = new List<IntPtr>();
+        EnumChildWindows(parent, delegate(IntPtr hwnd, IntPtr unused) { result.Add(hwnd); return true; }, IntPtr.Zero);
+        return result.ToArray();
+    }
+    public static string ClassName(IntPtr hwnd) {
+        var text = new StringBuilder(256); GetClassName(hwnd, text, text.Capacity); return text.ToString();
     }
     public static int ProcessId(IntPtr hwnd) {
         uint processId; GetWindowThreadProcessId(hwnd, out processId); return (int)processId;
@@ -56,15 +68,13 @@ function Get-InstallerWindows {
     })
 }
 function Click-WindowButton([IntPtr]$Window, [string[]]$Names) {
-    $root = [Windows.Automation.AutomationElement]::FromHandle($Window)
-    $condition = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Button)
-    foreach ($button in $root.FindAll([Windows.Automation.TreeScope]::Descendants, $condition)) {
-        $name = $button.Current.Name.Replace('&','').Trim()
-        if ($name -in $Names -and $button.Current.IsEnabled -and -not $button.Current.IsOffscreen) {
-            # Post the native click: synchronous Invoke can wait on the very
-            # modal dialog that this test needs to inspect next.
-            $handle = [IntPtr]::new($button.Current.NativeWindowHandle)
-            if ($handle -eq [IntPtr]::Zero) { throw "Botao sem handle nativo: $name" }
+    # Inno's VCL buttons are not exposed as UI Automation buttons on every runner.
+    foreach ($handle in [SiloNRWizardTest]::Children($Window)) {
+        if ([SiloNRWizardTest]::ClassName($handle) -notmatch 'Button') { continue }
+        $name = [SiloNRWizardTest]::Title($handle).Replace('&','').Trim()
+        if ($name -in $Names -and [SiloNRWizardTest]::IsWindowEnabled($handle) -and [SiloNRWizardTest]::IsWindowVisible($handle)) {
+            [void][SiloNRWizardTest]::SetForegroundWindow($Window)
+            # Asynchronous click lets the test inspect any modal dialog it opens.
             if (-not [SiloNRWizardTest]::PostMessage($handle, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)) { throw "Nao foi possivel clicar: $name" }
             Write-Host "Clicked installer button: $name"
             return $true
@@ -92,7 +102,7 @@ try {
         foreach ($window in $windows) {
             $title = [SiloNRWizardTest]::Title($window)
             if ($title -eq 'SiloNR - primeira instalacao') { $wizard = $window; break }
-            if ($title -like 'Setup*') { [void](Click-WindowButton $window @('Next >','Install')) }
+            if ($title -like 'Setup*') { [void](Click-WindowButton $window @('Next','Next >','Install')) }
         }
         if ($wizard -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 500 }
     } while ($wizard -eq [IntPtr]::Zero -and (Get-Date) -lt $deadline)
@@ -135,9 +145,11 @@ try {
     try {
         foreach ($window in Get-InstallerWindows) {
             Write-Host "Window at failure: $([SiloNRWizardTest]::Title($window))"
-            $root = [Windows.Automation.AutomationElement]::FromHandle($window)
-            $buttons = $root.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, [Windows.Automation.ControlType]::Button))
-            foreach ($button in $buttons) { Write-Host "Button: $($button.Current.Name); enabled=$($button.Current.IsEnabled); offscreen=$($button.Current.IsOffscreen)" }
+            foreach ($button in [SiloNRWizardTest]::Children($window)) {
+                if ([SiloNRWizardTest]::ClassName($button) -match 'Button') {
+                    Write-Host "Button: $([SiloNRWizardTest]::Title($button)); enabled=$([SiloNRWizardTest]::IsWindowEnabled($button)); visible=$([SiloNRWizardTest]::IsWindowVisible($button))"
+                }
+            }
         }
         Save-WizardScreenshot ([IntPtr]::Zero)
     } catch { Write-Warning "UI diagnostics: $($_.Exception.Message)" }
