@@ -52,11 +52,15 @@ try {
 Write-Host 'Installation, service identities, HTTPS, login and signup restriction passed.'
 & (Join-Path $PSScriptRoot 'windows-native-desktop-smoke.ps1') -Mode online
 $offlineDatabase = Join-Path $env:APPDATA 'br.com.silonr.desktop\silonr-offline.db'
-Stop-NativeService 'SiloNRApp'
 try {
+    Stop-NativeService 'SiloNRHTTPS'
+    Stop-NativeService 'SiloNRApp'
     & (Join-Path $PSScriptRoot 'windows-native-desktop-smoke.ps1') -Mode unavailable
     & (Join-Path $PSScriptRoot 'windows-native-desktop-smoke.ps1') -Mode offline
-} finally { Start-NativeService 'SiloNRApp' }
+} finally {
+    Start-NativeService 'SiloNRApp'
+    Start-NativeService 'SiloNRHTTPS'
+}
 Wait-Ready 'https://silonr.local/api/health/ready'
 $offlineBefore = (Get-FileHash $offlineDatabase -Algorithm SHA256).Hash
 $bytes=[Text.Encoding]::UTF8.GetBytes('%PDF-1.7 native smoke')
