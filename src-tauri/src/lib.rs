@@ -146,8 +146,10 @@ async fn open_local_server(window: WebviewWindow) -> Result<bool, String> {
     // The unified installer shortcut selects a fixed origin, never a URL from argv.
     let server = "https://silonr.local";
     check_server(server).await?;
+    let mut destination = validate_server_url(server)?;
+    destination.set_path("/app/dashboard");
     window
-        .navigate(validate_server_url(server)?)
+        .navigate(destination)
         .map_err(|error| format!("Nao foi possivel abrir o servidor local: {error}"))?;
     Ok(true)
 }

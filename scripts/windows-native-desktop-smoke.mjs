@@ -16,9 +16,11 @@ while (true) {
   await new Promise((resolve) => setTimeout(resolve, 500));
 }
 const browser = await chromium.connectOverCDP(endpoint);
+let page;
 try {
   const context = browser.contexts()[0];
-  const page = context.pages()[0] ?? await context.waitForEvent("page", { timeout: 30000 });
+  context.setDefaultTimeout(30000);
+  page = context.pages()[0] ?? await context.waitForEvent("page", { timeout: 30000 });
   if (mode === "online") {
     await page.waitForURL((url) => url.origin === "https://silonr.local", { timeout: 45000 });
     await page.locator("#email").waitFor({ state: "visible" });
@@ -38,6 +40,12 @@ try {
   }
   await page.screenshot({ path: screenshot });
   console.log(`Native Desktop ${mode}: expected UI displayed inside WebView2.`);
+} catch (error) {
+  if (page) {
+    console.error(`Desktop URL at failure: ${page.url()}`);
+    await page.screenshot({ path: screenshot }).catch(() => {});
+  }
+  throw error;
 } finally {
   await browser.close();
 }
