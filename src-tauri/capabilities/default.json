@@ -6,5 +6,5 @@
   "remote": {
     "urls": ["https://silonr.local/*"]
   },
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "production-bridge"]
 }

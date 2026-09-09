@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "production-bridge"
+description = "Permite que a interface HTTPS confiável do SiloNR salve e abra arquivos e instale atualizações assinadas no computador-servidor."
+commands.allow = [
+  "save_pdf_and_open",
+  "download_and_open_file",
+  "check_for_update",
+  "install_update",
+]
