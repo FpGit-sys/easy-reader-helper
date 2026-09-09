@@ -21,8 +21,16 @@ async function main() {
     );
     create index if not exists silonr_license_leases_expiry_idx
       on silonr_license_leases (entitlement_expires_at);
+
+    update licenses as license
+       set status = 'suspended', valid_until = null, offline_grace_days = 7, updated_at = now()
+     where license.status = 'trial'
+       and not exists (
+         select 1 from silonr_license_leases as lease
+          where lease.organization_id = license.organization_id
+       );
   `);
-  console.log("SiloNR licensing schema migrated successfully.");
+  console.log("SiloNR licensing schema migrated successfully; unmanaged local trials are now license-required.");
 }
 
 main()

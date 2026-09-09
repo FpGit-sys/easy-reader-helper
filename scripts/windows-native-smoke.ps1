@@ -37,6 +37,7 @@ foreach ($name in @('SiloNRApp','SiloNRHTTPS')) {
 $login=@{email=$config.AdminEmail;password=$config.AdminPassword} | ConvertTo-Json
 $session=New-Object Microsoft.PowerShell.Commands.WebRequestSession
 Invoke-RestMethod 'https://silonr.local/api/auth/sign-in/email' -Method Post -ContentType 'application/json' -Body $login -WebSession $session | Out-Null
+if ((Invoke-Database 'select status from licenses order by created_at desc limit 1;').Trim() -ne 'suspended') { throw 'Instalacao nova liberou teste local sem licenca central.' }
 # HttpClient preserves the response body on HTTP 400 in Windows PowerShell 5.1,
 # where Invoke-RestMethod may leave ErrorDetails null.
 Add-Type -AssemblyName System.Net.Http
@@ -102,6 +103,7 @@ Wait-Ready 'https://silonr.local/api/health/ready'
 if ((Get-FileHash $EnvFile -Algorithm SHA256).Hash -ne $before) { throw 'Atualizacao alterou segredos.' }
 if ((Get-FileHash $offlineDatabase -Algorithm SHA256).Hash -ne $offlineBefore) { throw 'Atualizacao alterou dados offline do Desktop.' }
 if ([int](Invoke-Database "select count(*) from evidences where name='native smoke';") -ne 1) { throw 'Atualizacao perdeu dados.' }
+if ((Invoke-Database 'select status from licenses order by created_at desc limit 1;').Trim() -ne 'suspended') { throw 'Atualizacao reativou teste local indevidamente.' }
 if (-not (Test-Path C:\ProgramData\SiloNR\conectar-outros-pcs\SiloNR-Desktop-Setup.exe)) { throw 'Conector Desktop ausente.' }
 & (Join-Path $tools 'Maintenance.ps1') -Action Diagnostics
 & (Join-Path $tools 'Maintenance.ps1') -Action Monitor

@@ -3,5 +3,8 @@
   "identifier": "default",
   "description": "Permissões mínimas da janela principal do SiloNR Desktop",
   "windows": ["main"],
+  "remote": {
+    "urls": ["https://silonr.local/*"]
+  },
   "permissions": ["core:default"]
 }

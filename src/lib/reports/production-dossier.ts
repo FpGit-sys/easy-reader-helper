@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { savePdfForUser } from "@/lib/native-files";
 import type { getProductionDossierData } from "@/server/operations/dossier.functions";
 
 type DossierData = Awaited<ReturnType<typeof getProductionDossierData>>;
@@ -305,9 +306,12 @@ export function generateProductionDossier(data: DossierData, options: Production
   return doc;
 }
 
-export function downloadProductionDossier(data: DossierData, options: ProductionDossierOptions) {
+export async function downloadProductionDossier(data: DossierData, options: ProductionDossierOptions) {
   const doc = generateProductionDossier(data, options);
   const safeFacility = data.facility.name.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
   const date = new Date(data.generatedAt).toISOString().slice(0, 10);
-  doc.save(`silonr-dossie-${safeFacility || "unidade"}-${date}.pdf`);
+  const filename = `silonr-dossie-${safeFacility || "unidade"}-${date}.pdf`;
+  const nativeResult = await savePdfForUser(filename, doc.output("arraybuffer"));
+  if (!nativeResult) doc.save(filename);
+  return nativeResult;
 }

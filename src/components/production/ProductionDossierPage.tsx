@@ -55,7 +55,8 @@ export function ProductionDossierPage() {
           includeAudit: options.audit && canReadAudit,
         },
       });
-      downloadProductionDossier(data, options);
+      const saved = await downloadProductionDossier(data, options);
+      if (saved) toast.success(`PDF salvo em ${saved.path} e aberto no leitor padrão do Windows.`);
       return data;
     },
     onSuccess: (data) => {

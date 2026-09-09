@@ -30,6 +30,8 @@ export const activateProductionLicense = createServerFn({ method: "POST" })
       licenseKey: data.licenseKey,
       label: `SiloNR ${data.organizationId.slice(0, 8)}`,
     });
+    const state = await getLocalLicenseState(data.organizationId);
+    if (!state?.managed || state.centralStatus !== claims.status) throw new Error("LICENSE_ACTIVATION_NOT_PERSISTED");
     await writeAuditEvent({
       organizationId: data.organizationId,
       actorUserId: session.user.id,
@@ -45,7 +47,7 @@ export const activateProductionLicense = createServerFn({ method: "POST" })
       },
       metadata: { rawLicenseKeyStored: false },
     });
-    return getLocalLicenseState(data.organizationId);
+    return state;
   });
 
 export const refreshProductionLicense = createServerFn({ method: "POST" })

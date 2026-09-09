@@ -1,9 +1,11 @@
 mod offline_v2;
 mod secure_store;
+mod updates;
 
 use offline_v2 as offline;
+use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
-use std::{fs, net::IpAddr, path::PathBuf, time::Duration};
+use std::{fs, net::IpAddr, path::{Path, PathBuf}, time::Duration};
 use tauri::{AppHandle, Manager, WebviewWindow};
 use url::Url;
 
@@ -83,6 +85,176 @@ pub(crate) fn ensure_local_configuration_page(window: &WebviewWindow) -> Result<
     Ok(())
 }
 
+fn same_origin(left: &Url, right: &Url) -> bool {
+    left.scheme() == right.scheme()
+        && left.host_str() == right.host_str()
+        && left.port_or_known_default() == right.port_or_known_default()
+}
+
+pub(crate) fn ensure_trusted_application_page(app: &AppHandle, window: &WebviewWindow) -> Result<Url, String> {
+    let current = window
+        .url()
+        .map_err(|error| format!("Não foi possível validar a origem da janela: {error}"))?;
+    if matches!(current.host_str(), Some("tauri.localhost") | Some("localhost")) {
+        return Ok(current);
+    }
+
+    let local_server = Url::parse("https://silonr.local").expect("fixed local server URL");
+    if local_launch_requested(std::env::args()) && same_origin(&current, &local_server) {
+        return Ok(current);
+    }
+
+    if let Some(config) = read_config(app)? {
+        let configured = validate_server_url(&config.server_url)?;
+        if same_origin(&current, &configured) {
+            return Ok(current);
+        }
+    }
+    Err("A página atual não tem permissão para acessar arquivos deste computador.".into())
+}
+
+fn safe_filename(value: &str, fallback: &str) -> String {
+    let candidate = value
+        .chars()
+        .map(|character| match character {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' | '\0'..='\u{1f}' => '_',
+            _ => character,
+        })
+        .collect::<String>()
+        .trim_matches(|character| character == ' ' || character == '.')
+        .chars()
+        .take(180)
+        .collect::<String>();
+    if candidate.is_empty() { fallback.to_string() } else { candidate }
+}
+
+fn available_download_path(download_dir: &Path, filename: &str) -> PathBuf {
+    let requested = download_dir.join(filename);
+    if !requested.exists() {
+        return requested;
+    }
+    let path = Path::new(filename);
+    let stem = path.file_stem().and_then(|value| value.to_str()).unwrap_or("arquivo");
+    let extension = path.extension().and_then(|value| value.to_str());
+    for number in 2..10_000 {
+        let next = match extension {
+            Some(extension) => format!("{stem} ({number}).{extension}"),
+            None => format!("{stem} ({number})"),
+        };
+        let candidate = download_dir.join(next);
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    download_dir.join(format!("{stem}-{}", uuid::Uuid::new_v4()))
+}
+
+#[cfg(windows)]
+fn open_with_default_application(path: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL};
+
+    let operation = "open\0".encode_utf16().collect::<Vec<_>>();
+    let target = path.as_os_str().encode_wide().chain(Some(0)).collect::<Vec<_>>();
+    let result = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            operation.as_ptr(),
+            target.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    if result as isize <= 32 {
+        return Err("O Windows não encontrou um aplicativo para abrir o arquivo.".into());
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn open_with_default_application(_path: &Path) -> Result<(), String> {
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SavedFile {
+    path: String,
+    opened_externally: bool,
+}
+
+fn save_download(app: &AppHandle, filename: &str, bytes: &[u8]) -> Result<PathBuf, String> {
+    let download_dir = app
+        .path()
+        .download_dir()
+        .map_err(|error| format!("Não foi possível localizar a pasta Downloads: {error}"))?;
+    fs::create_dir_all(&download_dir)
+        .map_err(|error| format!("Não foi possível preparar a pasta Downloads: {error}"))?;
+    let path = available_download_path(&download_dir, &safe_filename(filename, "silonr-arquivo"));
+    fs::write(&path, bytes).map_err(|error| format!("Não foi possível salvar o arquivo: {error}"))?;
+    Ok(path)
+}
+
+#[tauri::command]
+fn save_pdf_and_open(
+    app: AppHandle,
+    window: WebviewWindow,
+    filename: String,
+    content_base64: String,
+) -> Result<SavedFile, String> {
+    ensure_trusted_application_page(&app, &window)?;
+    let bytes = BASE64_STANDARD
+        .decode(content_base64)
+        .map_err(|_| "O PDF gerado está corrompido.".to_string())?;
+    if bytes.len() > 50 * 1024 * 1024 || !bytes.starts_with(b"%PDF-") {
+        return Err("O conteúdo gerado não é um PDF válido ou excede 50 MB.".into());
+    }
+    let filename = if filename.to_ascii_lowercase().ends_with(".pdf") {
+        filename
+    } else {
+        format!("{filename}.pdf")
+    };
+    let path = save_download(&app, &filename, &bytes)?;
+    open_with_default_application(&path)?;
+    Ok(SavedFile { path: path.display().to_string(), opened_externally: true })
+}
+
+#[tauri::command]
+async fn download_and_open_file(
+    app: AppHandle,
+    window: WebviewWindow,
+    url: String,
+    filename: String,
+) -> Result<SavedFile, String> {
+    let current = ensure_trusted_application_page(&app, &window)?;
+    let download_url = Url::parse(&url).map_err(|_| "Endereço de download inválido.".to_string())?;
+    if !same_origin(&current, &download_url) || download_url.scheme() != "https" {
+        return Err("O download foi recusado porque não pertence ao servidor SiloNR atual.".into());
+    }
+    let response = reqwest::Client::builder()
+        .timeout(Duration::from_secs(60))
+        .build()
+        .map_err(|error| format!("Não foi possível preparar o download: {error}"))?
+        .get(download_url)
+        .send()
+        .await
+        .map_err(|error| format!("Não foi possível baixar o arquivo: {error}"))?;
+    if !response.status().is_success() {
+        return Err(format!("O servidor recusou o download (HTTP {}).", response.status()));
+    }
+    if response.content_length().is_some_and(|length| length > 100 * 1024 * 1024) {
+        return Err("O arquivo excede o limite de 100 MB.".into());
+    }
+    let bytes = response.bytes().await.map_err(|error| format!("Download incompleto: {error}"))?;
+    if bytes.len() > 100 * 1024 * 1024 {
+        return Err("O arquivo excede o limite de 100 MB.".into());
+    }
+    let path = save_download(&app, &filename, &bytes)?;
+    open_with_default_application(&path)?;
+    Ok(SavedFile { path: path.display().to_string(), opened_externally: true })
+}
+
 #[tauri::command]
 fn get_saved_server_url(app: AppHandle, window: WebviewWindow) -> Result<Option<String>, String> {
     ensure_local_configuration_page(&window)?;
@@ -133,7 +305,7 @@ async fn check_server(server_url: &str) -> Result<ServerProbe, String> {
     })
 }
 
-fn local_launch_requested(args: impl Iterator<Item = String>) -> bool {
+pub(crate) fn local_launch_requested(args: impl Iterator<Item = String>) -> bool {
     args.skip(1).any(|arg| arg == "--local-server")
 }
 
@@ -229,6 +401,10 @@ pub fn run() {
             connect_to_server,
             open_online,
             open_local_server,
+            save_pdf_and_open,
+            download_and_open_file,
+            updates::check_for_update,
+            updates::install_update,
             offline::desktop_status,
             offline::pair_device,
             offline::refresh_offline_pack,

@@ -20,6 +20,7 @@ import {
 import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { GuidedTour } from "@/components/layout/GuidedTour";
+import { UpdateBanner } from "@/components/layout/UpdateBanner";
 import { Button } from "@/components/ui/button";
 import { hydrateStore, resetDemo, useAppState } from "@/lib/storage/store";
 import { cn } from "@/lib/utils";
@@ -190,7 +191,7 @@ function ProductionShell({
         )
       }
       footer={user?.name || user?.email ? `${user?.name ?? user?.email}` : "Usuário autenticado"}
-      topbar={<ProductionTopbar onMenu={() => setOpen(true)} />}
+      topbar={<><ProductionTopbar onMenu={() => setOpen(true)} /><UpdateBanner /></>}
       bottomNav={<BottomNav nav={productionNav} />}
     >
       {children}

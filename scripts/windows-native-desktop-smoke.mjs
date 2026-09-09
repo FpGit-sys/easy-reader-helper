@@ -26,6 +26,16 @@ try {
     await page.locator("#email").waitFor({ state: "visible" });
     await page.locator("#password").waitFor({ state: "visible" });
     assert.match(await page.title(), /SiloNR/);
+    const update = await page.evaluate(() => window.__TAURI__.core.invoke("check_for_update"));
+    assert.equal(update.currentVersion, "0.3.0");
+    assert.equal(update.supported, false);
+    await assert.rejects(
+      page.evaluate(() => window.__TAURI__.core.invoke("download_and_open_file", {
+        url: "https://example.invalid/untrusted.pdf",
+        filename: "untrusted.pdf",
+      })),
+      /recusado|não pertence/i,
+    );
   } else {
     await page.locator("#pairing-section").waitFor({ state: "visible" });
     assert.equal(new URL(page.url()).hostname, "tauri.localhost");

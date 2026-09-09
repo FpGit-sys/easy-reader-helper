@@ -12,7 +12,6 @@ const argsSchema = z.object({
   facility: z.string().trim().min(2).max(200),
   city: z.string().trim().max(120).optional(),
   state: z.string().trim().max(80).optional(),
-  trialDays: z.coerce.number().int().min(1).max(365).default(30),
 });
 
 function parseArgs(argv: string[]) {
@@ -32,7 +31,6 @@ function parseArgs(argv: string[]) {
     facility: values.facility,
     city: values.city,
     state: values.state,
-    trialDays: values["trial-days"],
   });
 }
 
@@ -61,7 +59,6 @@ async function main() {
   const db = getDb();
   const organizationId = crypto.randomUUID();
   const facilityId = crypto.randomUUID();
-  const validUntil = new Date(Date.now() + args.trialDays * 86_400_000);
   await db.transaction(async (tx) => {
     await tx.insert(organizations).values({ id: organizationId, name: args.organization });
     await tx
@@ -87,11 +84,11 @@ async function main() {
       .values({
         organizationId,
         plan: "professional",
-        status: "trial",
-        validUntil,
+        status: "suspended",
+        validUntil: null,
         maxFacilities: 1,
         maxUsers: 5,
-        offlineGraceDays: 30,
+        offlineGraceDays: 7,
       });
     await tx.insert(auditEvents).values(
       makeAuditEventValues({
@@ -104,7 +101,7 @@ async function main() {
         after: {
           organizationName: args.organization,
           facilityName: args.facility,
-          trialDays: args.trialDays,
+          licenseRequired: true,
           provisionedAdminEmail: authUser.email,
         },
         metadata: { source: "local-bootstrap-cli" },
@@ -112,7 +109,7 @@ async function main() {
     );
   });
   console.log(
-    `Instalação local provisionada para ${authUser.email}; trial até ${validUntil.toISOString().slice(0, 10)}.`,
+    `Instalação local provisionada para ${authUser.email}; ative a licença central para liberar novas operações.`,
   );
 }
 

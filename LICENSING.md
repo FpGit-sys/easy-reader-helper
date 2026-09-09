@@ -11,6 +11,8 @@ O SiloNR continua local: PostgreSQL, arquivos, usuários, inspeções e evidênc
 5. O servidor local guarda somente o hash da chave, um segredo cifrado e uma concessão assinada.
 6. A concessão é atualizada sob demanda. Sem pagamento, o ambiente entra em somente leitura após a carência; consulta, exportação e backup continuam disponíveis.
 
+Instalações comerciais não recebem um período de teste local. Antes da primeira ativação, o administrador consegue entrar, consultar registros, exportar e executar backup, mas não criar ou alterar dados operacionais. Após uma ativação bem-sucedida, o formulário da chave desaparece e a tela confirma que a licença central está vinculada ao servidor; a chave legível não fica armazenada.
+
 ## 1. Criar o projeto Supabase
 
 Execute a migration `supabase/migrations/20260826000000_licensing.sql` no projeto escolhido e publique:
@@ -110,6 +112,7 @@ Após o webhook de pagamento, confirme no Supabase que a licença está `active`
 1. Pague uma cobrança Sandbox e confirme que apenas um mês foi adicionado.
 2. Reenvie o mesmo webhook e confirme que `valid_until` não mudou novamente.
 3. Ative a chave no SiloNR e clique em **Verificar renovação**.
+   A tela deve mostrar **Licença central Ativa e vinculada a este servidor** e não deve pedir a chave novamente.
 4. Simule indisponibilidade da internet: o uso segue até `entitlement_expires_at`.
 5. Simule expiração/carência: criar ou alterar dados deve falhar com `LICENSE_EXPIRED`; leitura, exportação e backup devem continuar.
 6. Confirme que nenhum valor real aparece no Git, logs ou diagnóstico de suporte.

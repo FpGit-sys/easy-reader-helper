@@ -1,6 +1,9 @@
 #Requires -Version 5.1
 [CmdletBinding()]
-param()
+param(
+    [ValidatePattern('^[0-9]+\.[0-9]+\.[0-9]+$')]
+    [string]$AppVersion = '0.3.0'
+)
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
 $repository=(Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -67,8 +70,8 @@ $webview = Join-Path $stage 'prerequisites\MicrosoftEdgeWebview2Setup.exe'
 Invoke-WebRequest -UseBasicParsing 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $webview
 $signature = Get-AuthenticodeSignature $webview
 if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') { throw 'WebView2 sem assinatura Microsoft valida.' }
-Set-Content (Join-Path $stage 'version.txt') '0.2.2-native-preview' -Encoding ASCII
+Set-Content (Join-Path $stage 'version.txt') $AppVersion -Encoding ASCII
 $compiler='C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
 if (-not (Test-Path $compiler)) { throw 'Instale Inno Setup 6 no ambiente de build.' }
-& $compiler "/DStageDir=$stage" "/DOutputDir=$output" (Join-Path $PSScriptRoot 'Server.iss')
+& $compiler "/DStageDir=$stage" "/DOutputDir=$output" "/DAppVersion=$AppVersion" (Join-Path $PSScriptRoot 'Server.iss')
 if ($LASTEXITCODE -ne 0) { throw 'Build Inno Setup falhou.' }

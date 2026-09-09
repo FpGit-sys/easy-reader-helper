@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { downloadAndOpenForUser, openDownloadInBrowser } from "@/lib/native-files";
 import {
   Select,
   SelectContent,
@@ -104,8 +105,10 @@ export function ProductionDocumentsPage() {
           documentId,
         },
       }),
-    onSuccess: ({ url }) => {
-      window.location.assign(url);
+    onSuccess: async ({ url, filename }) => {
+      const saved = await downloadAndOpenForUser(url, filename);
+      if (saved) toast.success(`Arquivo salvo em ${saved.path} e aberto fora do SiloNR.`);
+      else openDownloadInBrowser(url);
     },
     onError: () => toast.error("Não foi possível liberar o download deste arquivo."),
   });

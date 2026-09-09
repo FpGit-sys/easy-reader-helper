@@ -100,7 +100,7 @@ bun run tenant:provision -- \
   --state "GO"
 ```
 
-Esse comando cria organização, unidade, membership administrativa, licença inicial e evento de auditoria. Não armazena a senha do administrador.
+Esse comando cria organização, unidade, membership administrativa, licença inicial bloqueada até a ativação central e evento de auditoria. Não armazena a senha do administrador. Não existe teste local automático nas instalações comerciais.
 
 ## Desenvolvimento e quality gate
 

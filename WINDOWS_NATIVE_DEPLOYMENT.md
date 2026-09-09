@@ -12,7 +12,7 @@ Os arquivos privados passam a ficar no disco, com os mesmos caminhos de objetos 
 
 ## 1. Preparação do dono do software
 
-1. Use Windows 11 x64 atualizado, conta administradora, SSD, pelo menos 8 GB de RAM e energia protegida. O pacote é x64; Windows ARM não é um alvo validado.
+1. Use Windows 10 Pro 22H2 (build 19045) ou Windows 11 x64 atualizado, conta administradora, SSD, pelo menos 8 GB de RAM e energia protegida. O pacote é x64; Windows ARM não é um alvo validado.
 2. Reserve o IPv4 do servidor no roteador e deixe a conexão Windows no perfil Privado. Não abra portas no roteador. Não é necessário comprar domínio.
 3. Escolha uma pasta de backup fora das pastas do SiloNR. Prefira disco externo **NTFS criptografado** com letra fixa. O agendamento SYSTEM não usa unidades de rede mapeadas; NAS exige configuração específica de conta e não é automatizado neste pacote.
 4. Separe `LICENSE_SERVICE_URL`, `LICENSE_CLIENT_API_KEY` e `LICENSE_SIGNING_PUBLIC_KEY` já configurados para sua central. A URL termina em `/functions/v1`.
@@ -25,10 +25,10 @@ O runtime Microsoft Visual C++ necessário ao PostgreSQL é incluído e instalad
 ## 2. Instalar o servidor
 
 1. Em GitHub → Actions → **SiloNR Windows Native Server**, abra uma execução concluída com sucesso e baixe o artefato `SiloNR-Servidor-Windows-Nativo`. Extraia o ZIP de transporte do GitHub.
-2. Execute `SiloNR-Servidor-Setup-0.2.2.exe` normalmente e autorize a elevação quando o Windows solicitar. Assim a abertura ao concluir pode voltar à conta original, mesmo quando outra conta administradora autoriza o UAC. Enquanto não houver assinatura de código, o Windows poderá alertar sobre editor desconhecido: confira a origem antes de executar; não desative a proteção do sistema.
+2. Execute `SiloNR-Servidor-Setup-0.3.0.exe` normalmente e autorize a elevação quando o Windows solicitar. Assim a abertura ao concluir pode voltar à conta original, mesmo quando outra conta administradora autoriza o UAC. Enquanto não houver assinatura de código, o Windows poderá alertar sobre editor desconhecido: confira a origem antes de executar; não desative a proteção do sistema.
 3. O assistente pede IP reservado, pasta de backup, os três valores de licenciamento, nome/e-mail/senha inicial do administrador, empresa e unidade. A senha deve ter 12–128 caracteres.
 4. Aguarde a configuração. Não desligue o PC. O instalador configura serviços, banco, migrações, primeiro administrador, certificado local, hosts, firewall e backup diário às 21h (horário do PC). Se o PC estiver desligado, a tarefa tenta executar quando disponível.
-5. Na conclusão, mantenha **Abrir SiloNR** marcado ou use o atalho **SiloNR** da Área de Trabalho. A tela de login abre dentro do aplicativo, já apontando para o servidor local. Faça login e use a tela de licença mensal na administração para ativar a **chave legível correspondente à licença paga**. Não use o hash nem o UUID como chave de ativação.
+5. Na conclusão, mantenha **Abrir SiloNR** marcado ou use o atalho **SiloNR** da Área de Trabalho. A tela de login abre dentro do aplicativo, já apontando para o servidor local. Faça login e use a tela de licença mensal na administração para ativar a **chave legível correspondente à licença paga**. Não use o hash nem o UUID como chave de ativação. A instalação não inclui teste local: sem concessão central, login, consulta, exportação e backup continuam disponíveis, mas novas operações ficam bloqueadas.
 6. Valide uma inspeção e um upload, ative o Desktop e execute um backup/restauração de teste antes de colocar dados reais.
 
 O PC servidor já fica pronto como estação de trabalho, sem um segundo instalador. O menu Iniciar também inclui **Abrir SiloNR**, **SiloNR - modo offline** e **Administrar servidor**. O atalho principal abre o sistema local; o atalho de modo offline abre a interface empacotada de pareamento e inspeções. A ativação de licença não substitui o pareamento para baixar dados offline. O aplicativo preserva o banco offline e a configuração por usuário Windows; abrir o sistema local não sobrescreve um pareamento existente. Os demais computadores dependem do servidor ligado para sincronizar. O acesso por `https://silonr.local` no navegador permanece opcional.
@@ -93,11 +93,13 @@ O importador reaproveita dump, objetos e chaves da instalação original. Não r
 
 A ida futura para VPS continua possível com PostgreSQL e os mesmos objetos. Não há nesta versão um assistente de exportação para S3: essa transferência precisa reconstruir metadados MIME e validar hashes, além de configurar o novo destino.
 
-## 7. Atualizar, reparar e desinstalar
+## 7. Atualizar dentro do SiloNR, reparar e desinstalar
 
-Execute o novo instalador sobre o existente. Antes de substituir binários ele faz backup e para os serviços. Usa as mesmas chaves e não repete o primeiro cadastro. Troca de versão principal PostgreSQL não é automática. Não altere manualmente a pasta de banco nem regenere segredos para reparar falhas.
+A versão 0.2.2 ainda não possui o atualizador. Para chegar à 0.3.0, execute o novo instalador **uma última vez manualmente sobre o existente**, sem desinstalar. Antes de substituir binários ele faz backup e para os serviços. Usa as mesmas chaves, mantém a licença e não repete o primeiro cadastro. Troca de versão principal PostgreSQL não é automática. Não altere manualmente a pasta de banco nem regenere segredos para reparar falhas.
 
-Ao atualizar de 0.2.1 para 0.2.2, não desinstale nem apague pastas: o aplicativo e os atalhos são acrescentados à instalação existente. Feche o Desktop antes de atualizar; o instalador pode solicitar o fechamento se o executável estiver em uso. Ele não força o encerramento. Uma instalação Desktop NSIS/MSI feita separadamente continua independente e não é removida automaticamente.
+A partir da 0.3.0, o aplicativo verifica um manifesto assinado ao abrir o ambiente de produção. Quando houver uma versão superior, mostra **Atualização SiloNR disponível → Atualizar agora**. O PC servidor baixa o instalador, verifica assinatura Ed25519 e SHA-256, pede a autorização UAC do Windows, cria backup e atualiza o pacote completo. O cliente não precisa desinstalar nem localizar arquivos. Se a assinatura ou o hash não conferir, o arquivo é descartado. Feche os demais computadores durante uma atualização do servidor.
+
+O botão funciona somente no atalho principal do PC servidor. Computadores conectados pela rede recebem as telas e correções do servidor automaticamente; mudanças futuras no executável offline desses computadores serão distribuídas por um pacote Desktop específico. Uma instalação Desktop NSIS/MSI feita separadamente continua independente e não é removida automaticamente.
 
 Se houve queda de energia na primeira instalação, execute novamente o mesmo instalador. A configuração pendente fica protegida para permitir retomada e é removida após sucesso. Um bootstrap incompleto que não possa ser retomado com segurança para e pede recuperação, sem apagar dados.
 
@@ -106,6 +108,20 @@ Desinstalar remove serviços, regra de firewall, tarefa e binários. **Não apag
 ## Build e critérios de entrega
 
 O workflow empacota Node 22, PostgreSQL 16.15, Caddy 2.10.2 e WinSW 2.12.0. Downloads de PostgreSQL/Caddy/WinSW têm SHA-256 fixado. O Desktop é compilado do mesmo checkout. Não execute `Build.ps1` em máquinas de clientes; ele é ferramenta de engenharia.
+
+### Configurar e publicar atualizações oficiais
+
+O atualizador usa uma chave exclusiva, diferente das chaves de licença. Execute uma única vez em um computador administrativo:
+
+```powershell
+bun run update:keys
+```
+
+Guarde `SILONR_UPDATE_SIGNING_PRIVATE_KEY` no cofre e cadastre somente seu valor em **GitHub → Settings → Secrets and variables → Actions → New repository secret**, com o nome exato `SILONR_UPDATE_SIGNING_PRIVATE_KEY`. Não grave a saída em arquivo dentro do repositório. O workflow deriva a chave pública sem imprimir a privada.
+
+Para publicar, abra **GitHub → Actions → Publicar atualização Windows → Run workflow**, informe a versão no formato `0.3.1`, um resumo curto e se a versão é necessária. O workflow valida o projeto, compila e testa o instalador, assina o manifesto e publica os dois arquivos em um GitHub Release. Use sempre uma versão maior e nunca substitua arquivos de um release já publicado.
+
+O endereço padrão usa `releases/latest` e, portanto, o repositório e seus Releases precisam permitir download sem login. Se o código permanecer privado, hospede o manifesto e o instalador em armazenamento HTTPS público controlado (por exemplo, bucket público exclusivo no Supabase) e configure `SILONR_UPDATE_MANIFEST_URL` na compilação; nunca coloque token de GitHub no software do cliente.
 
 O gate Windows abre o instalador interativo, verifica se o formulário e seus dez campos estão visíveis acima da janela principal, verifica o aviso de validação e cancela sem reportar sucesso falso. Publica uma captura do formulário vazio no artefato `SiloNR-Wizard-Visibility`. Também testa instalação silenciosa em banco vazio, recusa de configuração ausente, contas dos serviços, TLS, login, cadastro público fechado, download com assinatura válida/inválida, backup, restauração após corrupção de arquivo, estabilidade das chaves em atualização e preservação de dados na desinstalação. O conjunto unitário testa armazenamento, hash, links, traversal e expiração. Diferentes resoluções/escalas de tela, Windows 10 real, duas máquinas LAN, queda real de energia, ativação Asaas/Supabase real e recuperação de backup legado devem ser verificados no piloto. O novo gate não substitui os gates existentes de isolamento/offline/licenciamento.
 
