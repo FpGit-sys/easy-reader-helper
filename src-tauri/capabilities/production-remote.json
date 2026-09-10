@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/remote-schema.json",
+  "identifier": "production-remote",
+  "description": "Ponte nativa mínima para a interface HTTPS do servidor SiloNR local",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["https://silonr.local/*"]
+  },
+  "permissions": ["production-bridge"]
+}

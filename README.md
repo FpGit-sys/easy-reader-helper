@@ -15,6 +15,8 @@ A branch `production/silonr-v1` é a linha de engenharia do produto comercial e 
 
 ## Stack de produção
 
+Instalação local: [Windows nativo, sem Docker/WSL (pré-piloto)](./WINDOWS_NATIVE_DEPLOYMENT.md) ou [stack Docker existente](./LOCAL_DEPLOYMENT.md). Ambas preservam PostgreSQL, licenciamento e cliente Desktop; o Windows nativo usa arquivos privados no disco em vez de MinIO.
+
 - React 19 + TypeScript
 - TanStack Start / TanStack Router / TanStack Query
 - Tailwind CSS + componentes Radix/shadcn
@@ -98,7 +100,7 @@ bun run tenant:provision -- \
   --state "GO"
 ```
 
-Esse comando cria organização, unidade, membership administrativa, licença inicial e evento de auditoria. Não armazena a senha do administrador.
+Esse comando cria organização, unidade, membership administrativa, licença inicial bloqueada até a ativação central e evento de auditoria. Não armazena a senha do administrador. Não existe teste local automático nas instalações comerciais.
 
 ## Desenvolvimento e quality gate
 

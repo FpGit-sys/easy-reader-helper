@@ -203,14 +203,24 @@ export function ProductionAdministrationPage() {
 function LicenseSummary({ data, onChanged }: { data: AdminData; onChanged: () => Promise<void> }) {
   const license = data.license;
   const [licenseKey, setLicenseKey] = useState("");
+  const [activationError, setActivationError] = useState<string | null>(null);
   const activation = useMutation({
-    mutationFn: () => activateProductionLicense({ data: { organizationId: data.organization.id, licenseKey } }),
-    onSuccess: async () => {
+    mutationFn: async () => {
+      setActivationError(null);
+      const state = await activateProductionLicense({ data: { organizationId: data.organization.id, licenseKey } });
+      if (!state?.managed) throw new Error("LICENSE_ACTIVATION_NOT_PERSISTED");
+      return state;
+    },
+    onSuccess: async (state) => {
       setLicenseKey("");
-      toast.success("Licença ativada e validada.");
+      toast.success(`Licença ${licenseStatus(state.status)} ativada e gravada neste servidor.`);
       await onChanged();
     },
-    onError: (error) => toast.error(licenseError(error)),
+    onError: (error) => {
+      const message = licenseError(error);
+      setActivationError(message);
+      toast.error(message);
+    },
   });
   const refresh = useMutation({
     mutationFn: () => refreshProductionLicense({ data: { organizationId: data.organization.id } }),
@@ -240,20 +250,34 @@ function LicenseSummary({ data, onChanged }: { data: AdminData; onChanged: () =>
             Ambiente em somente leitura: {licenseReason(license.readOnlyReason)}. Consulta, exportação e backup continuam disponíveis.
           </div>
         ) : null}
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <Input
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={licenseKey}
-            onChange={(event) => setLicenseKey(event.target.value)}
-            placeholder="SLNR-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
-            maxLength={80}
-          />
-          <Button disabled={activation.isPending || licenseKey.trim().length < 20} onClick={() => activation.mutate()}>
-            {activation.isPending ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
-            Ativar licença
-          </Button>
+        {license?.managed ? (
+          <div className="mt-4 rounded border border-emerald-600/40 bg-emerald-500/10 p-3 text-sm">
+            <p className="font-medium text-emerald-700 dark:text-emerald-300">Licença central {licenseStatus(license.status)} e vinculada a este servidor.</p>
+            <p className="mt-1 text-muted-foreground">A chave SLNR foi validada e não é armazenada em texto legível. Não é necessário digitá-la novamente.</p>
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <Input
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              value={licenseKey}
+              onChange={(event) => setLicenseKey(event.target.value)}
+              placeholder="SLNR-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
+              maxLength={80}
+            />
+            <Button disabled={activation.isPending || licenseKey.trim().length < 20} onClick={() => activation.mutate()}>
+              {activation.isPending ? <Loader2 className="size-4 animate-spin" /> : <KeyRound className="size-4" />}
+              Ativar e gravar licença
+            </Button>
+          </div>
+        )}
+        {activationError ? (
+          <div role="alert" className="mt-3 rounded border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            {activationError} A licença não foi marcada como ativa neste computador.
+          </div>
+        ) : null}
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <Button variant="outline" disabled={!license?.managed || refresh.isPending} onClick={() => refresh.mutate()}>
             {refresh.isPending ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
             Verificar renovação
@@ -267,7 +291,7 @@ function LicenseSummary({ data, onChanged }: { data: AdminData; onChanged: () =>
           </p>
         ) : (
           <p className="mt-3 text-xs text-muted-foreground">
-            O período de teste local continua válido até a ativação de uma licença mensal.
+            Não há período de teste local. Faça login como administrador e ative uma licença válida; enquanto isso, os dados existentes permanecem disponíveis em somente leitura.
           </p>
         )}
       </section>
@@ -492,6 +516,7 @@ function licenseError(error: unknown) {
   if (message.includes("LICENSE_NOT_ACTIVE")) return "O pagamento desta licença ainda não foi confirmado ou ela está suspensa.";
   if (message.includes("LICENSE_EXPIRED")) return "A licença está expirada. Regularize o pagamento antes de ativar.";
   if (message.includes("INSTALLATION_LIMIT_REACHED")) return "O limite de instalações desta licença foi atingido.";
+  if (message.includes("LICENSE_ACTIVATION_NOT_PERSISTED")) return "A central respondeu, mas a ativação não ficou gravada. Nenhuma liberação foi aplicada; tente novamente e, se persistir, gere o diagnóstico de suporte.";
   if (message.includes("LICENSE_SERVICE_NOT_CONFIGURED")) return "O serviço de licenças ainda não foi configurado neste servidor.";
   if (message.includes("LICENSE_SERVICE")) return "Não foi possível consultar o serviço de licenças agora.";
   return "Não foi possível validar a licença.";

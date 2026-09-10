@@ -12,6 +12,9 @@ const serverEnvSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
+  STORAGE_DRIVER: z.enum(["s3", "filesystem"]).default("s3"),
+  FILE_STORAGE_PATH: z.string().default(""),
+  FILE_DOWNLOAD_SIGNING_SECRET: z.string().default(""),
   S3_ENDPOINT: z.string().url().optional().or(z.literal("")),
   S3_PUBLIC_ENDPOINT: z.string().url().optional().or(z.literal("")),
   S3_REGION: z.string().default("auto"),

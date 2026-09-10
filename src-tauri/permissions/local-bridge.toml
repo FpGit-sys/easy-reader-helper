@@ -1,0 +1,22 @@
+[[permission]]
+identifier = "local-bridge"
+description = "Permite que a interface empacotada configure o servidor e execute o modo offline do SiloNR."
+commands.allow = [
+  "get_saved_server_url",
+  "probe_server",
+  "connect_to_server",
+  "open_online",
+  "open_local_server",
+  "desktop_status",
+  "pair_device",
+  "refresh_offline_pack",
+  "list_offline_silos",
+  "start_offline_inspection",
+  "save_offline_answer",
+  "add_offline_evidence",
+  "remove_offline_evidence",
+  "request_offline_finalize",
+  "list_offline_inspections",
+  "get_offline_inspection",
+  "sync_now",
+]

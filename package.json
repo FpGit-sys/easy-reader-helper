@@ -1,6 +1,6 @@
 {
   "name": "silonr",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -23,6 +23,8 @@
     "license:migrate": "bun run scripts/migrate-licensing.ts",
     "license:generate": "bun run scripts/generate-license-keys.ts",
     "license:keys": "bun run scripts/generate-license-signing-keypair.ts",
+    "update:keys": "bun run scripts/generate-update-signing-keypair.ts",
+    "update:manifest": "bun run scripts/create-update-manifest.ts",
     "db:studio": "drizzle-kit studio",
     "auth:migrate": "bun run scripts/migrate-auth.ts",
     "tenant:provision": "bun run scripts/provision-tenant.ts",

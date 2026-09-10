@@ -1,0 +1,97 @@
+name: Publicar atualização Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versão sem v, por exemplo 0.3.0"
+        required: true
+        type: string
+      notes:
+        description: "Resumo curto exibido no SiloNR"
+        required: true
+        type: string
+      mandatory:
+        description: "Marcar como atualização necessária"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: silonr-windows-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      SILONR_APP_VERSION: ${{ inputs.version }}
+      SILONR_UPDATE_MANIFEST_URL: https://github.com/${{ github.repository }}/releases/latest/download/silonr-update.json
+      SILONR_UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.SILONR_UPDATE_SIGNING_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.0"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+      - name: Validar entrada e derivar chave pública
+        shell: pwsh
+        run: |
+          if ('${{ inputs.version }}' -notmatch '^\d+\.\d+\.\d+$') { throw 'Versao invalida.' }
+          if ([string]::IsNullOrWhiteSpace($env:SILONR_UPDATE_SIGNING_PRIVATE_KEY)) { throw 'Configure o secret SILONR_UPDATE_SIGNING_PRIVATE_KEY.' }
+          bun run scripts/export-update-public-key.ts --github-env
+      - name: Validar aplicação
+        shell: pwsh
+        run: |
+          bun install --frozen-lockfile
+          bun run routes:generate
+          bun run typecheck
+          bun run lint
+          bun run test
+          bun run build
+      - name: Compilar Desktop
+        shell: pwsh
+        run: |
+          bun run tauri icon src-tauri/icons/app-icon.svg
+          bun run desktop:build --bundles nsis
+          cargo test --manifest-path src-tauri/Cargo.toml --release --lib
+      - name: Instalar compilador Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Montar instalador unificado
+        shell: powershell
+        run: ./deploy/windows-native/Build.ps1 -AppVersion '${{ inputs.version }}'
+      - name: Testar atualização preservando dados
+        shell: powershell
+        run: ./scripts/windows-native-smoke.ps1
+      - name: Criar manifesto assinado
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_NOTES: ${{ inputs.notes }}
+          RELEASE_MANDATORY: ${{ inputs.mandatory }}
+        run: |
+          $installer = "artifacts/windows-server/output/SiloNR-Servidor-Setup-$env:RELEASE_VERSION.exe"
+          $url = "https://github.com/${{ github.repository }}/releases/download/v$env:RELEASE_VERSION/SiloNR-Servidor-Setup-$env:RELEASE_VERSION.exe"
+          $mandatory = if ($env:RELEASE_MANDATORY -eq 'true') { '--mandatory' } else { $null }
+          bun run scripts/create-update-manifest.ts --version $env:RELEASE_VERSION --installer $installer --url $url --notes $env:RELEASE_NOTES --output 'artifacts/windows-server/output/silonr-update.json' $mandatory
+      - name: Publicar GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: SiloNR ${{ inputs.version }}
+          body: ${{ inputs.notes }}
+          make_latest: true
+          files: |
+            artifacts/windows-server/output/SiloNR-Servidor-Setup-${{ inputs.version }}.exe
+            artifacts/windows-server/output/silonr-update.json

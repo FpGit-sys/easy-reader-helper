@@ -468,10 +468,21 @@ elements.openOnline.addEventListener("click", async () => {
     if (!proceed) return;
   }
   try {
-    await invoke("open_online");
+    if (!(await invoke("open_local_server"))) await invoke("open_online");
   } catch (error) {
     showGlobal(humanError(error));
   }
 });
 
-loadStatus();
+async function startDesktop() {
+  await loadStatus();
+  if (!invoke) return;
+  try {
+    await invoke("open_local_server");
+  } catch {
+    elements.openOnline.hidden = false;
+    showGlobal("O servidor local ainda não está pronto. Aguarde alguns instantes e clique em Abrir online para tentar novamente. O modo offline continua disponível para computadores já ativados.");
+  }
+}
+
+startDesktop();
