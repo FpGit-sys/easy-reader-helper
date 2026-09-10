@@ -73,7 +73,11 @@ jobs:
         run: ./deploy/windows-native/Build.ps1 -AppVersion '${{ inputs.version }}'
       - name: Testar atualização preservando dados
         shell: powershell
-        run: ./scripts/windows-native-smoke.ps1
+        run: |
+          $env:SILONR_UI_TEST_DEPENDENCIES = Join-Path $env:RUNNER_TEMP 'silonr-playwright'
+          npm install --prefix $env:SILONR_UI_TEST_DEPENDENCIES --no-save --no-package-lock --ignore-scripts --no-audit --no-fund playwright@1.58.2
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./scripts/windows-native-smoke.ps1
       - name: Criar manifesto assinado
         shell: pwsh
         env:
