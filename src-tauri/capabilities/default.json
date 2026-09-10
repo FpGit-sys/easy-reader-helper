@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Permissões da interface local empacotada do SiloNR Desktop",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "local-bridge"]
 }
