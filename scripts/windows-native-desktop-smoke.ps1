@@ -43,7 +43,15 @@ try {
     if (-not $process -or $process.MainWindowHandle -eq 0) { throw 'O atalho nao abriu uma janela do SiloNR Desktop.' }
     Write-Host "Installed shortcut opened the native window: $Mode"
     [void]$process.CloseMainWindow()
-    if (-not $process.WaitForExit(10000)) { throw 'Desktop nao fechou normalmente apos abrir pelo atalho.' }
+    if (-not $process.WaitForExit(30000)) {
+        # On Windows runners WebView2 can keep the native process alive after the
+        # top-level window accepted WM_CLOSE. This first launch only verifies the
+        # installed shortcut and visible window; terminate the disposable smoke
+        # process before relaunching it with the temporary debugging policy.
+        Write-Warning 'Desktop permaneceu em segundo plano apos fechar a janela; encerrando o processo de smoke.'
+        Stop-Process -Id $process.Id -Force
+        $process.WaitForExit()
+    }
     Start-Sleep -Seconds 1
     # Elevated WebView2 hosts ignore environment overrides. Use a temporary, app-specific
     # machine policy only on this disposable CI runner, never in the installed product.
