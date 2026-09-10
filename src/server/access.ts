@@ -1,5 +1,6 @@
 import { and, eq, isNull, or } from "drizzle-orm";
 import { getDb } from "@/server/db/client";
+import { assertLicenseAllowsMutation } from "@/server/licensing/local";
 import { memberships } from "@/server/db/schema";
 import { assertPermission, type Permission, type Role } from "@/server/rbac";
 
@@ -62,8 +63,13 @@ export async function requirePermission(input: {
   organizationId: string;
   facilityId?: string | null;
   permission: Permission;
+  licenseMutation?: boolean;
 }) {
   const scope = await resolveAccessScope(input);
   assertPermission(scope.role, input.permission);
+  const writePermission = input.permission.endsWith(".write") || input.permission === "requirements.publish";
+  if (writePermission || input.licenseMutation) {
+    await assertLicenseAllowsMutation(input.organizationId);
+  }
   return scope;
 }

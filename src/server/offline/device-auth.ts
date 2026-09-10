@@ -1,8 +1,9 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { requirePermission } from "@/server/access";
 import { getDb } from "@/server/db/client";
 import { facilities, organizations } from "@/server/db/schema";
-import { devices, licenses } from "@/server/db/schema.extensions";
+import { devices } from "@/server/db/schema.extensions";
+import { getLocalLicenseState } from "@/server/licensing/local";
 import { type Permission } from "@/server/rbac";
 import { bearerToken, tokenHash } from "./crypto";
 
@@ -70,23 +71,10 @@ export async function requireDevice(
     permission,
   });
 
-  const [license] = await db
-    .select({
-      status: licenses.status,
-      validUntil: licenses.validUntil,
-      offlineGraceDays: licenses.offlineGraceDays,
-    })
-    .from(licenses)
-    .where(eq(licenses.organizationId, row.organizationId))
-    .orderBy(desc(licenses.createdAt))
-    .limit(1);
-
-  if (!license || (license.status !== "trial" && license.status !== "active")) {
-    throw new Error("LICENSE_NOT_ACTIVE");
-  }
-  if (license.validUntil && license.validUntil.getTime() < Date.now()) {
-    throw new Error("LICENSE_EXPIRED");
-  }
+  const license = await getLocalLicenseState(row.organizationId);
+  const offlineGraceDays = license?.offlineGraceDays ?? 0;
+  const allowedUntilValue = license?.graceUntil ?? license?.validUntil ?? new Date(0).toISOString();
+  const licenseValidUntil = new Date(allowedUntilValue);
 
   await db
     .update(devices)
@@ -100,8 +88,8 @@ export async function requireDevice(
     userId: row.userId,
     organizationName: row.organizationName,
     facilityName: row.facilityName,
-    offlineGraceDays: license.offlineGraceDays,
-    licenseValidUntil: license.validUntil,
+    offlineGraceDays,
+    licenseValidUntil,
   };
 }
 

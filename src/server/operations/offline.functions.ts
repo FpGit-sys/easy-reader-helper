@@ -25,6 +25,7 @@ export const createDesktopPairingCode = createServerFn({ method: "POST" })
       organizationId: data.organizationId,
       facilityId: data.facilityId,
       permission: "inspections.execute",
+      licenseMutation: true,
     });
 
     const code = generatePairingCode();
@@ -122,6 +123,7 @@ export const revokeMyDesktopDevice = createServerFn({ method: "POST" })
       organizationId: data.organizationId,
       facilityId: data.facilityId,
       permission: "inspections.execute",
+      licenseMutation: true,
     });
 
     const db = getDb();

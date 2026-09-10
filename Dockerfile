@@ -13,7 +13,7 @@ RUN bun run routes:generate && bun run typecheck && bun run build
 # Reusable target for controlled database/auth migrations in Compose.
 FROM build AS migrate
 ENV NODE_ENV=production
-CMD ["sh", "-lc", "bun run db:migrate && bun run auth:migrate"]
+CMD ["sh", "-lc", "bun run db:migrate && bun run auth:migrate && bun run license:migrate"]
 
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
