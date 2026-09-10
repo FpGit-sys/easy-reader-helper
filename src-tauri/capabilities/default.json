@@ -1,10 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissões mínimas da janela principal do SiloNR Desktop",
+  "description": "Permissões da interface local empacotada do SiloNR Desktop",
   "windows": ["main"],
-  "remote": {
-    "urls": ["https://silonr.local/*"]
-  },
-  "permissions": ["core:default", "production-bridge"]
+  "permissions": ["core:default"]
 }
