@@ -32,6 +32,7 @@ jobs:
       SILONR_APP_VERSION: ${{ inputs.version }}
       SILONR_UPDATE_MANIFEST_URL: https://github.com/${{ github.repository }}/releases/latest/download/silonr-update.json
       SILONR_UPDATE_SIGNING_PRIVATE_KEY: ${{ secrets.SILONR_UPDATE_SIGNING_PRIVATE_KEY }}
+      SILONR_UPDATE_SMOKE_MODE: prepublish
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2

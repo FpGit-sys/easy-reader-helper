@@ -26,9 +26,28 @@ try {
     await page.locator("#email").waitFor({ state: "visible" });
     await page.locator("#password").waitFor({ state: "visible" });
     assert.match(await page.title(), /SiloNR/);
-    const update = await page.evaluate(() => window.__TAURI__.core.invoke("check_for_update"));
-    assert.equal(update.currentVersion, "0.3.0");
-    assert.equal(update.supported, false);
+    const expectedVersion = process.env.SILONR_APP_VERSION;
+    assert.match(expectedVersion ?? "", /^\d+\.\d+\.\d+$/);
+    const updateSmokeMode = process.env.SILONR_UPDATE_SMOKE_MODE ?? "unsupported";
+    if (updateSmokeMode === "prepublish") {
+      let update;
+      try {
+        update = await page.evaluate(() => window.__TAURI__.core.invoke("check_for_update"));
+      } catch (error) {
+        assert.match(String(error), /HTTP 404 Not Found/);
+        console.log("First signed release has no previous update manifest, as expected.");
+      }
+      if (update) {
+        assert.equal(update.currentVersion, expectedVersion);
+        assert.equal(update.supported, true);
+        assert.equal(update.available, false);
+      }
+    } else {
+      assert.equal(updateSmokeMode, "unsupported");
+      const update = await page.evaluate(() => window.__TAURI__.core.invoke("check_for_update"));
+      assert.equal(update.currentVersion, expectedVersion);
+      assert.equal(update.supported, false);
+    }
     await assert.rejects(
       page.evaluate(() => window.__TAURI__.core.invoke("download_and_open_file", {
         url: "https://example.invalid/untrusted.pdf",
