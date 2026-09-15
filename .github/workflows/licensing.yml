@@ -56,5 +56,7 @@ jobs:
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Test Edge Function timestamp normalization
+        run: deno test supabase/tests/licensing_edge_test.ts
       - name: Type-check Edge Functions
         run: deno check supabase/functions/license-activate/index.ts supabase/functions/license-refresh/index.ts supabase/functions/asaas-webhook/index.ts

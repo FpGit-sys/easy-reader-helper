@@ -43,6 +43,12 @@ export function normalizeLicenseKey(value: string): string {
   return value.trim().toUpperCase().replaceAll(/[^A-Z0-9]/g, "");
 }
 
+export function canonicalizeEntitlementTimestamp(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) throw new Error("LICENSE_ENTITLEMENT_TIME_INVALID");
+  return parsed.toISOString();
+}
+
 export async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -113,7 +119,10 @@ function base64Url(value: Uint8Array | string): string {
 
 export async function signEntitlement(record: CentralEntitlementRecord): Promise<string> {
   const issuedAt = new Date();
-  const graceUntil = new Date(record.graceUntil);
+  const validUntil = record.validUntil === null
+    ? null
+    : canonicalizeEntitlementTimestamp(record.validUntil);
+  const graceUntil = new Date(canonicalizeEntitlementTimestamp(record.graceUntil));
   const requestedTtlDays = Number(Deno.env.get("LICENSE_TOKEN_TTL_DAYS") ?? "7");
   const ttlDays = Number.isFinite(requestedTtlDays) ? Math.min(Math.max(requestedTtlDays, 1), 30) : 7;
   const normalExpiry = new Date(issuedAt.getTime() + ttlDays * 86_400_000);
@@ -129,8 +138,8 @@ export async function signEntitlement(record: CentralEntitlementRecord): Promise
     installationId: record.installationId,
     plan: record.plan,
     status: record.status,
-    validUntil: record.validUntil,
-    graceUntil: record.graceUntil,
+    validUntil,
+    graceUntil: graceUntil.toISOString(),
     offlineGraceDays: record.offlineGraceDays,
     maxFacilities: record.maxFacilities,
     maxUsers: record.maxUsers,
