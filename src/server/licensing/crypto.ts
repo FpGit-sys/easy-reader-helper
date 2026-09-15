@@ -18,21 +18,23 @@ export const centralLicenseStatusSchema = z.enum([
   "cancelled",
 ]);
 
+const entitlementTimestampSchema = z.string().datetime({ offset: true });
+
 const entitlementSchema = z.object({
   iss: z.string().min(1),
   licenseId: z.string().uuid(),
   installationId: z.string().uuid(),
   plan: z.string().min(1).max(80),
   status: centralLicenseStatusSchema,
-  validUntil: z.string().datetime().nullable(),
-  graceUntil: z.string().datetime(),
+  validUntil: entitlementTimestampSchema.nullable(),
+  graceUntil: entitlementTimestampSchema,
   offlineGraceDays: z.number().int().min(0).max(30),
   maxFacilities: z.number().int().positive(),
   maxUsers: z.number().int().positive(),
   maxInstallations: z.number().int().positive(),
   entitlementVersion: z.number().int().nonnegative(),
-  issuedAt: z.string().datetime(),
-  expiresAt: z.string().datetime(),
+  issuedAt: entitlementTimestampSchema,
+  expiresAt: entitlementTimestampSchema,
 });
 
 export type EntitlementClaims = z.infer<typeof entitlementSchema>;
